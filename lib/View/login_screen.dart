@@ -3,7 +3,8 @@ import 'package:mobiletesting/View/home_admin.dart';
 import 'package:mobiletesting/View/home_runner.dart';
 import 'package:mobiletesting/View/home_student.dart';
 import 'package:mobiletesting/View/signup_screen.dart';
-import 'package:mobiletesting/services/auth_service.dart';
+import 'package:mobiletesting/services/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,47 +17,11 @@ class _LoginScreenState extends State<LoginScreen> {
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   bool isPasswordHidden = true;
-  final AuthService _authService = AuthService();
-  bool isLoading = false;
-  void login() async {
-    setState(() {
-      isLoading = true;
-    });
-
-    // call login method from authservice with user inputs
-    String? result = await _authService.login(
-      email: emailController.text,
-      password: passwordController.text,
-    );
-    setState(() {
-      isLoading = false;
-    });
-    // Navigate based on the role or show the error message
-    if (result == "Admin") {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeAdmin()),
-      );
-    } else if (result == "Runner") {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeRunner()),
-      );
-    } else if (result == "Student") {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeStudent()),
-      );
-    } else {
-      // login failed: show the error message
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Signup Failed $result")));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 196, 222, 234),
       body: SafeArea(
@@ -99,12 +64,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 // login button
-                isLoading
+                authProvider.isLoading
                     ? Center(child: CircularProgressIndicator())
                     : SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: login,
+                        onPressed: () async {
+                          String email = emailController.text.trim();
+                          String password = passwordController.text.trim();
+
+                          String? error = await authProvider.login(
+                            email: email,
+                            password: password,
+                          );
+
+                          if (error == null) {
+                            if (authProvider.role == "Admin") {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => HomeAdmin()),
+                              );
+                            } else if (authProvider.role == "Runner") {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => HomeRunner()),
+                              );
+                            } else if (authProvider.role == "Student") {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => HomeStudent()),
+                              );
+                            }
+                            else{
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Login Failed: $error")),
+                              );
+                            }
+                          }
+                        },
                         child: Text("Login"),
                       ),
                     ),
