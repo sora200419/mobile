@@ -1,3 +1,4 @@
+// lib\View\home_runner.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -33,38 +34,41 @@ class HomeRunner extends StatelessWidget {
   }
 }
 
-  /// **🔥 从 Firebase Firestore 获取数据**
-  Widget _buildTabContent(String status) {
-    return StreamBuilder(
-      stream: FirebaseFirestore.instance
-          .collection('orders') // Firestore 里的集合名称
-          .where('status', isEqualTo: status) // 过滤订单状态
-          .snapshots(), // 监听数据变化
-      builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator()); // 加载动画
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text("No $status orders")); // 没有订单
-        }
+/// **🔥 从 Firebase Firestore 获取数据**
+Widget _buildTabContent(String status) {
+  return StreamBuilder(
+    stream:
+        FirebaseFirestore.instance
+            .collection('orders') // Firestore 里的集合名称
+            .where('status', isEqualTo: status) // 过滤订单状态
+            .snapshots(), // 监听数据变化
+    builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Center(child: CircularProgressIndicator()); // 加载动画
+      }
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        return Center(child: Text("No $status orders")); // 没有订单
+      }
 
-        // **🔥 解析 Firestore 数据**
-        var orders = snapshot.data!.docs;
-        return ListView.builder(
-          padding: EdgeInsets.all(16),
-          itemCount: orders.length,
-          itemBuilder: (context, index) {
-            var order = orders[index];
-            return Card(
-              margin: EdgeInsets.symmetric(vertical: 8),
-              child: ListTile(
-                title: Text(order['title']), // 订单标题
-                subtitle: Text("From: ${order['from']} → To: ${order['to']}"), // 显示起点和终点
-                trailing: Icon(Icons.arrow_forward_ios),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+      // **🔥 解析 Firestore 数据**
+      var orders = snapshot.data!.docs;
+      return ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: orders.length,
+        itemBuilder: (context, index) {
+          var order = orders[index];
+          return Card(
+            margin: EdgeInsets.symmetric(vertical: 8),
+            child: ListTile(
+              title: Text(order['title']), // 订单标题
+              subtitle: Text(
+                "From: ${order['from']} → To: ${order['to']}",
+              ), // 显示起点和终点
+              trailing: Icon(Icons.arrow_forward_ios),
+            ),
+          );
+        },
+      );
+    },
+  );
+}

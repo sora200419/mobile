@@ -1,3 +1,4 @@
+// lib\utils\theme\custom_themes\checkbox_theme.dart
 import 'package:flutter/material.dart';
 
 /// Custom Class for Light & Dark Text Themes
@@ -12,8 +13,8 @@ class CampusLinkCheckboxTheme {
         return Colors.white;
       } else {
         return Colors.black;
-    }
-  }),
+      }
+    }),
     fillColor: MaterialStateProperty.resolveWith((states) {
       if (states.contains(MaterialState.selected)) {
         return Colors.blue;
@@ -41,5 +42,4 @@ class CampusLinkCheckboxTheme {
       }
     }),
   );
-
 }

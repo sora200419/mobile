@@ -1,3 +1,4 @@
+// lib\View\signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/login_screen.dart';
 import 'package:mobiletesting/services/auth_service.dart';
@@ -89,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 labelText: "Password",
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  onPressed: (){
+                  onPressed: () {
                     setState(() {
                       isPasswordHidden = !isPasswordHidden;
                     });
@@ -122,11 +123,15 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 20),
             // signup button
-            isLoading ? Center(child: CircularProgressIndicator(),):
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(onPressed: _signup, child: Text("Signup")),
-            ),
+            isLoading
+                ? Center(child: CircularProgressIndicator())
+                : SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _signup,
+                    child: Text("Signup"),
+                  ),
+                ),
             const SizedBox(height: 15),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

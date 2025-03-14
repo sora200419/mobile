@@ -1,6 +1,7 @@
+// lib\utils\theme\custom_themes\chip_theme.dart
 import 'package:flutter/material.dart';
 
-class CampusLinkChipTheme{
+class CampusLinkChipTheme {
   CampusLinkChipTheme._();
 
   static ChipThemeData lightChipTheme = ChipThemeData(

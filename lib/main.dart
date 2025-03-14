@@ -1,3 +1,4 @@
+// lib\main.dart
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 // import 'package:firebase_core/firebase_core.dart';
 import 'package:mobiletesting/utils/theme/theme.dart';
@@ -10,9 +11,7 @@ import 'package:mobiletesting/utils/constants/firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Todo: Add Widgets Binding
   // Todo: Init Local Storage
@@ -23,16 +22,11 @@ void main() async {
   runApp(CampusLink());
 }
 
-
 class CampusLink extends StatelessWidget {
   const CampusLink({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-
-      home: LoginScreen(),
-    );
+    return MaterialApp(debugShowCheckedModeBanner: false, home: LoginScreen());
   }
 }

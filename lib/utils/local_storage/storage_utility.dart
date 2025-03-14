@@ -1,7 +1,10 @@
+// lib\utils\local_storage\storage_utility.dart
+
 import 'package:get_storage/get_storage.dart';
 
 class CampusLinkLocalStorage {
-  static final CampusLinkLocalStorage _instance = CampusLinkLocalStorage._internal();
+  static final CampusLinkLocalStorage _instance =
+      CampusLinkLocalStorage._internal();
 
   factory CampusLinkLocalStorage() {
     return _instance;

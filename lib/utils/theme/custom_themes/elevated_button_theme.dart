@@ -1,3 +1,4 @@
+// lib\utils\theme\custom_themes\elevated_button_theme.dart
 import 'package:flutter/material.dart';
 
 /// -- Light & Dark Elevated Button Themes
@@ -14,12 +15,14 @@ class CampusLinkElevatedButtonTheme {
       disabledBackgroundColor: Colors.grey,
       side: const BorderSide(color: Colors.blue),
       padding: const EdgeInsets.symmetric(vertical: 18),
-      textStyle: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+      textStyle: const TextStyle(
+        fontSize: 16,
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
       ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
-
 
   /// -- Dark Theme
   static final darkElevatedButtonTheme = ElevatedButtonThemeData(
@@ -31,12 +34,12 @@ class CampusLinkElevatedButtonTheme {
       disabledBackgroundColor: Colors.grey,
       side: const BorderSide(color: Colors.black),
       padding: const EdgeInsets.symmetric(vertical: 18),
-      textStyle: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+      textStyle: const TextStyle(
+        fontSize: 16,
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
       ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
-
 }
-
-

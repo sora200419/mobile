@@ -1,3 +1,4 @@
+// lib\utils\validators\validation.dart
 class CampusLinkValidator {
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -7,7 +8,7 @@ class CampusLinkValidator {
     // Regular expression for email validation
     final emailRegExp = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
-    if(!emailRegExp.hasMatch(value)) {
+    if (!emailRegExp.hasMatch(value)) {
       return 'Invalid email address.';
     }
 
@@ -20,7 +21,7 @@ class CampusLinkValidator {
     }
 
     // Check for minimum password length
-    if (value.length < 6){
+    if (value.length < 6) {
       return 'Password must be least at 6 characters long.';
     }
 
@@ -56,5 +57,4 @@ class CampusLinkValidator {
 
     return null;
   }
-
 }

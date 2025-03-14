@@ -1,3 +1,4 @@
+// lib\utils\constants\text_strings.dart
 /// This file contains all the App Text in String format.
 class AppStrings {
   // GLOBAL TEXTS
@@ -22,7 +23,8 @@ class AppStrings {
 
   // Home Screen
   static const String homeAppBarTitle = 'Welcome to CampusLink';
-  static const String homeAppBarSubtitle = 'Empowering your campus life, one tap at a time.';
+  static const String homeAppBarSubtitle =
+      'Empowering your campus life, one tap at a time.';
 
   // Additional Examples
   static const String shopNowTitle = 'Ready to Shop or Sell?';

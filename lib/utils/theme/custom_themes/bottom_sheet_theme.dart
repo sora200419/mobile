@@ -1,6 +1,8 @@
+// lib\utils\theme\custom_themes\bottom_sheet_theme.dart
+
 import 'package:flutter/material.dart';
 
-class CampusLinkBottomSheetTheme{
+class CampusLinkBottomSheetTheme {
   CampusLinkBottomSheetTheme._();
 
   static BottomSheetThemeData lightBottomSheetTheme = BottomSheetThemeData(
@@ -18,5 +20,4 @@ class CampusLinkBottomSheetTheme{
     constraints: const BoxConstraints(minWidth: double.infinity),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
   );
-
 }

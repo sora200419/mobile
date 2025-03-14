@@ -1,9 +1,10 @@
+// lib\utils\helpers\helper_functions.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 class CampusLinkHelperFunctions {
-  static Color ? getColor(String value) {
+  static Color? getColor(String value) {
     /// Define product specific colors here and it will match the attribute colors and show specific
 
     if (value == 'Green') {
@@ -18,7 +19,7 @@ class CampusLinkHelperFunctions {
       return Colors.pink;
     } else if (value == 'Grey') {
       return Colors.grey;
-    }  else if (value == 'Purple') {
+    } else if (value == 'Purple') {
       return Colors.purple;
     } else if (value == 'Black') {
       return Colors.black;
@@ -38,16 +39,16 @@ class CampusLinkHelperFunctions {
   }
 
   static void showSnackBar(String message) {
-    ScaffoldMessenger.of(Get.context!).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      Get.context!,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   static void showAlert(String title, String message) {
     showDialog(
-        context: Get.context!,
-        builder: (BuildContext context) {
-          return AlertDialog(
+      context: Get.context!,
+      builder: (BuildContext context) {
+        return AlertDialog(
           title: Text(title),
           content: Text(message),
           actions: [
@@ -62,8 +63,7 @@ class CampusLinkHelperFunctions {
   }
 
   static void navigateToScreen(BuildContext context, Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   static String truncateText(String text, int maxLength) {
@@ -90,7 +90,10 @@ class CampusLinkHelperFunctions {
     return MediaQuery.of(Get.context!).size.width;
   }
 
-  static String getFormattedDate(DateTime date, {String format = 'dd MMM yyyy'}) {
+  static String getFormattedDate(
+    DateTime date, {
+    String format = 'dd MMM yyyy',
+  }) {
     return DateFormat(format).format(date);
   }
 
@@ -101,15 +104,12 @@ class CampusLinkHelperFunctions {
   static List<Widget> wrapWidgets(List<Widget> widgets, int rowSize) {
     final wrappedList = <Widget>[];
     for (var i = 0; i < widgets.length; i += rowSize) {
-      final rowChildren = widgets.sublist(i, i + rowSize > widgets.length ? widgets.length : i + rowSize);
-      wrappedList.add(Row(children: rowChildren,));
+      final rowChildren = widgets.sublist(
+        i,
+        i + rowSize > widgets.length ? widgets.length : i + rowSize,
+      );
+      wrappedList.add(Row(children: rowChildren));
     }
     return wrappedList;
   }
-
-
-
-
-
-
 }
