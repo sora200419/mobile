@@ -1,4 +1,5 @@
 // lib\View\login_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/home_admin.dart';
 import 'package:mobiletesting/View/home_runner.dart';
@@ -59,14 +60,19 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: const Color.fromARGB(255, 196, 222, 234),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Image.asset("assets/logo.png"),
+              SizedBox(
+                height: 200,
+                child: Image.asset("assets/logo.png", fit: BoxFit.contain),
+              ),
               const SizedBox(height: 20),
+
               // email
               TextField(
                 controller: emailController,
