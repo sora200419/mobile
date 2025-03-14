@@ -1,6 +1,8 @@
 // lib\View\home_runner.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:mobiletesting/services/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class HomeRunner extends StatelessWidget {
   const HomeRunner({super.key});
@@ -12,6 +14,14 @@ class HomeRunner extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text('Runner'),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.logout),
+              onPressed: () {
+                Provider.of<AuthProvider>(context, listen: false).logout(context);
+              },
+            ),
+          ],
           bottom: TabBar(
             tabs: [
               Tab(icon: Icon(Icons.hourglass_empty), text: "Pending"),
