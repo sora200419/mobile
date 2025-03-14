@@ -60,80 +60,82 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 196, 222, 234),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Image.asset("assets/logo.png"),
-              const SizedBox(height: 20),
-              // email
-              TextField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 15),
-              // password
-              TextField(
-                controller: passwordController,
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        isPasswordHidden = !isPasswordHidden;
-                      });
-                    },
-                    icon: Icon(
-                      isPasswordHidden
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Image.asset("assets/logo.png"),
+                const SizedBox(height: 20),
+                // email
+                TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    border: OutlineInputBorder(),
                   ),
                 ),
-                obscureText: isPasswordHidden,
-              ),
-              const SizedBox(height: 20),
-              // login button
-              isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: login,
-                      child: Text("Login"),
-                    ),
-                  ),
-              const SizedBox(height: 15),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    "Don't have an account? ",
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => SignupScreen()),
-                      );
-                    },
-                    child: Text(
-                      "Signup here",
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.blue,
-                        letterSpacing: -1,
+                const SizedBox(height: 15),
+                // password
+                TextField(
+                  controller: passwordController,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          isPasswordHidden = !isPasswordHidden;
+                        });
+                      },
+                      icon: Icon(
+                        isPasswordHidden
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
+                  obscureText: isPasswordHidden,
+                ),
+                const SizedBox(height: 20),
+                // login button
+                isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: login,
+                        child: Text("Login"),
+                      ),
+                    ),
+                const SizedBox(height: 15),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      "Don't have an account? ",
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => SignupScreen()),
+                        );
+                      },
+                      child: Text(
+                        "Signup here",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.blue,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
