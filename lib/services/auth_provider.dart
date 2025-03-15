@@ -8,22 +8,27 @@ class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   User? _user;
   String? _role;
+  String? _username;
   bool _isLoading = false;
   bool _isAuthenticated = false;
 
   User? get user => _user;
   String? get role => _role;
+  String? get username => _username;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _isAuthenticated;
 
-  void checkUser() async {
+  Future<void> checkUser() async {
     _user = FirebaseAuth.instance.currentUser;
     _isAuthenticated = user != null;
 
     if (_isAuthenticated) {
       await _fetchUserRole();
+      await _fetchUsername();
     }
 
+    print(username);
+    print(role);
     notifyListeners();
   }
 
@@ -34,14 +39,11 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // error
     String? result = await _authService.login(email: email, password: password);
 
     _isLoading = false;
     if (result != null && !result.contains("ERROR")) {
-      _user = FirebaseAuth.instance.currentUser;
-      _role = result;
-      notifyListeners();
+      await checkUser();
       return null;
     } else {
       return result;
@@ -55,8 +57,7 @@ class AuthProvider extends ChangeNotifier {
     _isAuthenticated = false;
     notifyListeners();
 
-    Navigator.pushAndRemoveUntil(
-      context,
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen()),
       (route) => false,
     );
@@ -70,7 +71,19 @@ class AuthProvider extends ChangeNotifier {
               .doc(_user!.uid)
               .get();
       _role = userDoc['role'];
-      notifyListeners();
+      // notifyListeners();
+    }
+  }
+
+  Future<void> _fetchUsername() async {
+    if (_user != null) {
+      DocumentSnapshot userDoc =
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(_user!.uid)
+          .get();
+      _username = userDoc['name'];
+      // notifyListeners();
     }
   }
 }

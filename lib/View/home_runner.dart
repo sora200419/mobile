@@ -8,11 +8,14 @@ class HomeRunner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return DefaultTabController(
       length: 4, // Number of tab
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Runner'),
+          title: Text("Runner"),
           actions: [
             IconButton(
               icon: Icon(Icons.logout),
