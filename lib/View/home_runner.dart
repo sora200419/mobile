@@ -1,7 +1,7 @@
 //lib\View\home_runner.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
+import 'package:mobiletesting/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class HomeRunner extends StatelessWidget {
