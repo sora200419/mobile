@@ -4,6 +4,7 @@ import 'package:mobiletesting/View/home_admin.dart';
 import 'package:mobiletesting/View/home_runner.dart';
 import 'package:mobiletesting/View/home_student.dart';
 import 'package:mobiletesting/View/signup_screen.dart';
+import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
