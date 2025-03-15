@@ -1,8 +1,8 @@
 // lib\View\home_student.dart
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/tasks/views/task_list_screen.dart'; // Import
-import 'package:provider/provider.dart'; // Import
-import 'package:mobiletesting/providers/tasks_provider.dart'; // Import
+import 'package:mobiletesting/features/tasks/views/task_list_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:mobiletesting/providers/tasks_provider.dart';
 
 class HomeStudent extends StatelessWidget {
   const HomeStudent({Key? key}) : super(key: key);
@@ -10,12 +10,10 @@ class HomeStudent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      // Wrap with ChangeNotifierProvider
       create: (context) => TasksProvider(),
       child: Scaffold(
-        // Add Scaffold here
         appBar: AppBar(title: const Text('Student Home')),
-        body: TaskListScreen(), // Use TaskListScreen
+        body: TaskListScreen(),
       ),
     );
   }

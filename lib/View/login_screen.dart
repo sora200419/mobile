@@ -1,11 +1,9 @@
 // lib\View\login_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/home_admin.dart';
 import 'package:mobiletesting/View/home_runner.dart';
 import 'package:mobiletesting/View/home_student.dart';
 import 'package:mobiletesting/View/signup_screen.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,47 +23,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
       backgroundColor: const Color.fromARGB(255, 196, 222, 234),
       body: SafeArea(
         child: SingleChildScrollView(
-<<<<<<< HEAD
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 200,
-                child: Image.asset("assets/logo.png", fit: BoxFit.contain),
-              ),
-              const SizedBox(height: 20),
-
-              // email
-              TextField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 15),
-              // password
-              TextField(
-                controller: passwordController,
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        isPasswordHidden = !isPasswordHidden;
-                      });
-                    },
-                    icon: Icon(
-                      isPasswordHidden
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-=======
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -78,7 +38,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: "Email",
                     border: OutlineInputBorder(),
->>>>>>> origin/Runner
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -133,10 +92,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             } else if (authProvider.role == "Student") {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => HomeStudent()),
+                                MaterialPageRoute(
+                                  builder: (_) => HomeStudent(),
+                                ),
                               );
-                            }
-                            else{
+                            } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text("Login Failed: $error")),
                               );
