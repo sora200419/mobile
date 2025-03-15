@@ -1,4 +1,4 @@
-// lib\utils\constants
+// lib\utils\constants\enums.dart
 /// LIST OF Enums
 
 enum TextSizes { small, medium, large }

@@ -32,7 +32,7 @@ dependencies:
   cloud_firestore: ^5.6.5
   firebase_auth: ^5.5.1
   provider: ^6.1.2
-
+  flutter_dotenv: ^5.0.3
 
 # ---- PACKAGES END ---- #
 
