@@ -1,4 +1,4 @@
-// lib\models\task.dart
+// lib/models/task.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobiletesting/utils/constants/enums.dart';
 
@@ -65,7 +65,6 @@ class Task {
     );
   }
 
-  // Convert a Task object into a Map (for storing in Firestore)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -73,10 +72,10 @@ class Task {
       'description': description,
       'userId': userId,
       'runnerId': runnerId,
-      'postedAt': Timestamp.fromDate(postedAt), // Use Timestamp for Firestore
+      'postedAt': Timestamp.fromDate(postedAt),
       'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
       'category': category,
-      'status': status.toString(), // Store enum as string
+      'status': status.toString(),
       'rewardPoints': rewardPoints,
       'location': location,
       'imageUrl': imageUrl,
@@ -84,7 +83,6 @@ class Task {
     };
   }
 
-  // Create a Task object from a Map (from Firestore document)
   factory Task.fromMap(Map<String, dynamic> map) {
     return Task(
       id: map['id'] ?? '',
@@ -92,13 +90,12 @@ class Task {
       description: map['description'] ?? '',
       userId: map['userId'] ?? '',
       runnerId: map['runnerId'],
-      postedAt: (map['postedAt'] as Timestamp).toDate(),
-      deadline:
-          map['deadline'] != null
-              ? (map['deadline'] as Timestamp).toDate()
-              : null,
+      postedAt:
+          (map['postedAt'] as Timestamp?)?.toDate() ??
+          DateTime.now(), // Handle potential null
+      deadline: (map['deadline'] as Timestamp?)?.toDate(),
       category: map['category'] ?? '',
-      status: _stringToTaskStatus(map['status']), // Convert string to enum
+      status: _stringToTaskStatus(map['status']),
       rewardPoints: (map['rewardPoints'] ?? 0.0).toDouble(),
       location: map['location'],
       imageUrl: map['imageUrl'],
@@ -106,16 +103,10 @@ class Task {
     );
   }
 
-  // Helper function to convert string to RunnerTaskStatus enum
   static RunnerTaskStatus _stringToTaskStatus(String? status) {
-    if (status == null) {
-      return RunnerTaskStatus.pending; // Or your default status
-    }
-    // Match the string to the enum value.  Important:  This must match
-    // the string representation used in `toMap`.
     return RunnerTaskStatus.values.firstWhere(
       (e) => e.toString() == status,
-      orElse: () => RunnerTaskStatus.pending, // Default if not found
+      orElse: () => RunnerTaskStatus.pending,
     );
   }
 }

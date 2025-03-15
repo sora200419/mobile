@@ -1,10 +1,10 @@
-// lib\features\tasks\views\add_task_screen.dart
+// lib/features/tasks/views/add_task_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/models/task.dart';
 import 'package:mobiletesting/providers/tasks_provider.dart';
 import 'package:mobiletesting/utils/constants/enums.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddTaskScreen extends StatefulWidget {
   @override
@@ -15,16 +15,18 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _categoryController =
-      TextEditingController(); // For simplicity, using a text field
+  String _selectedCategory = 'Errand'; // Default category
+  final List<String> _categories = [
+    'Errand',
+    'Tutoring',
+    'Other',
+  ]; // Example categories
   DateTime? _selectedDeadline;
-  // Add controllers for other fields as needed
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _categoryController.dispose();
     super.dispose();
   }
 
@@ -35,10 +37,22 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       firstDate: DateTime.now(),
       lastDate: DateTime(2101),
     );
-    if (picked != null && picked != _selectedDeadline) {
-      setState(() {
-        _selectedDeadline = picked;
-      });
+    if (picked != null) {
+      final TimeOfDay? time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+      if (time != null) {
+        setState(() {
+          _selectedDeadline = DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            time.hour,
+            time.minute,
+          );
+        });
+      }
     }
   }
 
@@ -46,8 +60,6 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     if (_formKey.currentState!.validate()) {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        // Handle the case where the user is not logged in.  This should not happen
-        // if your app's flow is correct, but it's good to have a check.
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('User not logged in!')));
@@ -58,12 +70,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         id: '', // Firestore will generate the ID
         title: _titleController.text,
         description: _descriptionController.text,
-        userId: user.uid, // Use the current user's UID
+        userId: user.uid,
         postedAt: DateTime.now(),
         deadline: _selectedDeadline,
-        category: _categoryController.text, // Get the category
-        status: RunnerTaskStatus.pending, // Initial status
-        rewardPoints: 10.0, // Set a default reward, or let the user choose
+        category: _selectedCategory, // Use selected category
+        status: RunnerTaskStatus.pending,
+        rewardPoints: 10.0, //  Set default or get from user
         isCompleted: false,
       );
 
@@ -72,7 +84,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           context,
           listen: false,
         ).addTask(newTask);
-        Navigator.pop(context); // Go back to the previous screen
+        Navigator.pop(context);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Task added successfully!')));
@@ -117,14 +129,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 },
               ),
               SizedBox(height: 16),
-              TextFormField(
-                controller: _categoryController,
-                decoration: InputDecoration(
-                  labelText: 'Category (e.g., Errand, Tutoring)',
-                ),
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: InputDecoration(labelText: 'Category'),
+                items:
+                    _categories.map((String category) {
+                      return DropdownMenuItem<String>(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedCategory = newValue!;
+                  });
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a category';
+                    return 'Please select a category';
                   }
                   return null;
                 },
@@ -137,13 +159,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     onPressed: () => _selectDeadline(context),
                     child: Text(
                       _selectedDeadline == null
-                          ? 'Select Date'
-                          : "${_selectedDeadline!.toLocal()}".split(' ')[0],
+                          ? 'Select Date and Time'
+                          : "${_selectedDeadline!.toLocal()}".split(
+                            '.',
+                          )[0], //remove millisecond
                     ),
                   ),
                 ],
               ),
-              // Add more fields here as needed (e.g., location, image upload)
+              // Add more fields (location, image)
               SizedBox(height: 24),
               ElevatedButton(onPressed: _addTask, child: Text('Post Task')),
             ],
