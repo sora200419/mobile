@@ -1,4 +1,3 @@
-// lib\View\signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/login_screen.dart';
 import 'package:mobiletesting/services/auth_service.dart';
