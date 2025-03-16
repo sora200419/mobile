@@ -71,7 +71,6 @@ class AuthProvider extends ChangeNotifier {
               .doc(_user!.uid)
               .get();
       _role = userDoc['role'];
-      // notifyListeners();
     }
   }
 
@@ -83,7 +82,6 @@ class AuthProvider extends ChangeNotifier {
           .doc(_user!.uid)
           .get();
       _username = userDoc['name'];
-      // notifyListeners();
     }
   }
 }
