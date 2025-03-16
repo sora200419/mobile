@@ -1,11 +1,11 @@
 // lib/View/home_student.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
+import 'package:mobiletesting/features/task/services/rating_service.dart';
 import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:mobiletesting/features/task/views/task_rating_screen.dart';
@@ -20,9 +20,9 @@ class HomeStudent extends StatefulWidget {
 
 class _HomeStudentState extends State<HomeStudent> {
   final TaskService _taskService = TaskService();
+  final RatingService _ratingService = RatingService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  int _selectedIndex = 0;
 
   @override
   void dispose() {
@@ -32,8 +32,6 @@ class _HomeStudentState extends State<HomeStudent> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-
     return DefaultTabController(
       length: 3, // Number of tabs
       child: Scaffold(
@@ -118,7 +116,7 @@ class _HomeStudentState extends State<HomeStudent> {
               ),
             ),
 
-            // Points display
+            // Points display with explanation
             FutureBuilder<int>(
               future: _taskService.getUserPoints(),
               builder: (context, snapshot) {
@@ -128,29 +126,40 @@ class _HomeStudentState extends State<HomeStudent> {
 
                 int points = snapshot.data ?? 0;
 
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 16,
-                  ),
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.stars, color: Colors.amber),
-                      const SizedBox(width: 8),
-                      Text(
-                        'My Points: $points',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                return Tooltip(
+                  message:
+                      'Earn points by creating tasks, receiving good ratings, and completing tasks for others!',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 16,
+                    ),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.stars, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Text(
+                          'My Points: $points',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade700,
+                          size: 16,
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -289,6 +298,10 @@ class _HomeStudentState extends State<HomeStudent> {
 
   // Build card for individual task
   Widget _buildTaskCard(Task task) {
+    // Get user role
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userRole = authProvider.role;
+
     // Choose color based on status
     Color statusColor;
     switch (task.status) {
@@ -436,6 +449,43 @@ class _HomeStudentState extends State<HomeStudent> {
                 ],
               ),
 
+              // Role-specific message
+              if (task.status == 'open' &&
+                  userRole == 'Student' &&
+                  task.requesterId != FirebaseAuth.instance.currentUser?.uid)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.blue.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Only runners can accept tasks',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Action buttons based on status and user role
               if (task.status == 'assigned' &&
                   (task.requesterId == FirebaseAuth.instance.currentUser?.uid ||
@@ -470,55 +520,101 @@ class _HomeStudentState extends State<HomeStudent> {
                   ),
                 ),
 
+              // Rating button for completed tasks with check for existing rating
               if (task.status == 'completed' &&
                   (task.requesterId == FirebaseAuth.instance.currentUser?.uid ||
                       task.providerId ==
                           FirebaseAuth.instance.currentUser?.uid) &&
                   task.providerId != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // Show the rating screen for the provider
-                          String userIdToRate =
-                              task.requesterId ==
-                                      FirebaseAuth.instance.currentUser?.uid
-                                  ? task.providerId!
-                                  : task.requesterId;
-                          String userNameToRate =
-                              task.requesterId ==
-                                      FirebaseAuth.instance.currentUser?.uid
-                                  ? task.providerName!
-                                  : task.requesterName;
+                FutureBuilder<bool>(
+                  future: _ratingService.hasUserRatedTask(task.id!),
+                  builder: (context, snapshot) {
+                    bool hasRated = snapshot.data ?? false;
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => TaskRatingScreen(
-                                    task: task,
-                                    userIdToRate: userIdToRate,
-                                    userNameToRate: userNameToRate,
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          hasRated
+                              ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.star,
+                                      size: 16,
+                                      color: Colors.amber,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Already Rated',
+                                      style: TextStyle(
+                                        color: Colors.amber.shade800,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              : ElevatedButton.icon(
+                                onPressed: () {
+                                  // Show the rating screen for the provider
+                                  String userIdToRate =
+                                      task.requesterId ==
+                                              FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.uid
+                                          ? task.providerId!
+                                          : task.requesterId;
+                                  String userNameToRate =
+                                      task.requesterId ==
+                                              FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.uid
+                                          ? task.providerName!
+                                          : task.requesterName;
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => TaskRatingScreen(
+                                            task: task,
+                                            userIdToRate: userIdToRate,
+                                            userNameToRate: userNameToRate,
+                                          ),
+                                    ),
+                                  ).then((_) {
+                                    // Refresh state when returning from rating screen
+                                    setState(() {});
+                                  });
+                                },
+                                icon: const Icon(Icons.star, size: 16),
+                                label: const Text('Rate'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
                                   ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.star, size: 16),
-                        label: const Text('Rate'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          backgroundColor: Colors.amber,
-                          foregroundColor: Colors.black87,
-                        ),
+                                  backgroundColor: Colors.amber,
+                                  foregroundColor: Colors.black87,
+                                ),
+                              ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
             ],
           ),

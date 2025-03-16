@@ -84,8 +84,15 @@ class TaskService {
       User? user = _auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
-      // Get user name
+      // Check if the user is a runner
       DocumentSnapshot userDoc = await usersCollection.doc(user.uid).get();
+      String userRole = (userDoc.data() as Map<String, dynamic>)['role'] ?? '';
+
+      if (userRole != 'Runner') {
+        throw Exception('Only runners can accept tasks');
+      }
+
+      // Get user name
       String userName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
 
       // Update task status

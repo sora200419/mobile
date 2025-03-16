@@ -47,17 +47,22 @@ class Rating {
 }
 
 class RatingService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Points awarded for receiving a good rating
+  // Points awarded for different activities
   static const int POINTS_GOOD_RATING = 2; // For ratings >= 4
+  // Points awarded to requester for good service received
+  static const int POINTS_REQUESTER_GOOD_SERVICE = 3; // For good ratings
+  // Points awarded to requester for completing the task
+  static const int POINTS_REQUESTER_TASK_COMPLETED = 2; // For task completion
 
   // Collection references
   final CollectionReference ratingsCollection = FirebaseFirestore.instance
       .collection('ratings');
   final CollectionReference usersCollection = FirebaseFirestore.instance
       .collection('users');
+  final CollectionReference tasksCollection = FirebaseFirestore.instance
+      .collection('tasks');
 
   // Rate a user
   Future<void> rateUser(
@@ -70,6 +75,12 @@ class RatingService {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) throw Exception('User not logged in');
 
+      // Check if user has already rated this task
+      bool alreadyRated = await hasUserRatedTask(taskId);
+      if (alreadyRated) {
+        throw Exception('You have already rated this task');
+      }
+
       // Add rating to Firestore
       await ratingsCollection.add({
         'taskId': taskId,
@@ -80,16 +91,54 @@ class RatingService {
         'timestamp': DateTime.now(),
       });
 
-      // Award points for good ratings
-      if (rating >= 4.0) {
-        // Get current points
-        DocumentSnapshot userDoc = await usersCollection.doc(userId).get();
-        int currentPoints =
-            (userDoc.data() as Map<String, dynamic>)['points'] ?? 0;
+      // Get task details to identify roles
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      Map<String, dynamic> taskData = taskDoc.data() as Map<String, dynamic>;
 
-        // Update points
-        await usersCollection.doc(userId).update({
-          'points': currentPoints + POINTS_GOOD_RATING,
+      String requesterId = taskData['requesterId'] ?? '';
+      String? providerId = taskData['providerId'];
+
+      // Check if the current user is the requester rating the provider
+      bool isRequesterRatingProvider =
+          currentUser.uid == requesterId && userId == providerId;
+
+      // Check if the current user is the provider rating the requester
+      bool isProviderRatingRequester =
+          providerId != null &&
+          currentUser.uid == providerId &&
+          userId == requesterId;
+
+      // Award points for good ratings to service provider
+      if (isRequesterRatingProvider && rating >= 4.0) {
+        // Get provider's current points
+        DocumentSnapshot providerDoc =
+            await usersCollection.doc(providerId).get();
+        int providerPoints =
+            (providerDoc.data() as Map<String, dynamic>)['points'] ?? 0;
+
+        // Update provider's points
+        await usersCollection.doc(providerId).update({
+          'points': providerPoints + POINTS_GOOD_RATING,
+        });
+      }
+
+      // Award points to requester for receiving good service or completion
+      if (isProviderRatingRequester) {
+        // Get requester's current points
+        DocumentSnapshot requesterDoc =
+            await usersCollection.doc(requesterId).get();
+        int requesterPoints =
+            (requesterDoc.data() as Map<String, dynamic>)['points'] ?? 0;
+
+        // Determine points to award
+        int pointsToAward = POINTS_REQUESTER_TASK_COMPLETED;
+        if (rating >= 4.0) {
+          pointsToAward += POINTS_REQUESTER_GOOD_SERVICE;
+        }
+
+        // Update requester's points
+        await usersCollection.doc(requesterId).update({
+          'points': requesterPoints + pointsToAward,
         });
       }
 
@@ -188,6 +237,29 @@ class RatingService {
     } catch (e) {
       print('Error checking if user has rated task: $e');
       return false;
+    }
+  }
+
+  // Get specific rating for a task by current user
+  Future<Rating?> getUserRatingForTask(String taskId) async {
+    try {
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) return null;
+
+      QuerySnapshot ratingSnapshot =
+          await ratingsCollection
+              .where('taskId', isEqualTo: taskId)
+              .where('ratedByUserId', isEqualTo: currentUser.uid)
+              .get();
+
+      if (ratingSnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      return Rating.fromFirestore(ratingSnapshot.docs.first);
+    } catch (e) {
+      print('Error getting user rating for task: $e');
+      return null;
     }
   }
 

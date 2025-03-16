@@ -1,11 +1,13 @@
 // lib\features\task\views\task_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:mobiletesting/services/auth_provider.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final bool isCreating;
@@ -370,9 +372,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final task = widget.task!;
     final currentUserId = _auth.currentUser?.uid ?? '';
 
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userRole = authProvider.role;
+
     final bool isRequester = task.requesterId == currentUserId;
     final bool isProvider = task.providerId == currentUserId;
-    final bool canAccept = task.status == 'open' && !isRequester;
+
+    final bool canAccept =
+        task.status == 'open' && userRole == 'Runner' && !isRequester;
     final bool canComplete =
         task.status == 'assigned' && (isRequester || isProvider);
     final bool canCancel =
