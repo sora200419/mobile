@@ -92,10 +92,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             } else if (authProvider.role == "Student") {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => HomeStudent()),
+                                MaterialPageRoute(
+                                  builder: (_) => HomeStudent(),
+                                ),
                               );
-                            }
-                            else{
+                            } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text("Login Failed: $error")),
                               );

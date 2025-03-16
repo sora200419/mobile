@@ -1,3 +1,4 @@
+// lib\services\auth_provider.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -77,10 +78,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _fetchUsername() async {
     if (_user != null) {
       DocumentSnapshot userDoc =
-      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(_user!.uid)
-          .get();
+          await FirebaseFirestore.instance
+              .collection("users")
+              .doc(_user!.uid)
+              .get();
       _username = userDoc['name'];
     }
   }

@@ -1,3 +1,4 @@
+// lib\View\home_runner.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
@@ -8,7 +9,6 @@ class HomeRunner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final authProvider = Provider.of<AuthProvider>(context);
 
     return DefaultTabController(
@@ -20,7 +20,10 @@ class HomeRunner extends StatelessWidget {
             IconButton(
               icon: Icon(Icons.logout),
               onPressed: () {
-                Provider.of<AuthProvider>(context, listen: false).logout(context);
+                Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                ).logout(context);
               },
             ),
           ],

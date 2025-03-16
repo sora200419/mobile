@@ -1,3 +1,4 @@
+// lib\main.dart
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobiletesting/View/home_student.dart';
 import 'package:mobiletesting/services/auth_service.dart';
@@ -15,12 +16,9 @@ import 'package:mobiletesting/View/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await FirebaseAuth.instance.signOut();
-
 
   // Todo: Add Widgets Binding
   // Todo: Init Local Storage
@@ -32,13 +30,14 @@ void main() async {
     MultiProvider(
       providers: [
         // Make AuthService globally accessible
-        ChangeNotifierProvider(create: (context) => AuthProvider()..checkUser()),
+        ChangeNotifierProvider(
+          create: (context) => AuthProvider()..checkUser(),
+        ),
       ],
       child: MyApp(),
     ),
   );
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -49,8 +48,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       home: Consumer<AuthProvider>(
-        builder: (context, authProvider, child){
-          return authProvider.isAuthenticated  ? HomeStudent() : LoginScreen();
+        builder: (context, authProvider, child) {
+          return authProvider.isAuthenticated ? HomeStudent() : LoginScreen();
         },
       ),
     );
