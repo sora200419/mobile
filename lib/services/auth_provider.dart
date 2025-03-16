@@ -25,7 +25,7 @@ class AuthProvider extends ChangeNotifier {
 
     if (_isAuthenticated) {
       await _fetchUserRole();
-      await _fetchUsername();
+      await fetchUsername();
     }
 
     print(username);
@@ -75,7 +75,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchUsername() async {
+  Future<void> fetchUsername() async {
     if (_user != null) {
       DocumentSnapshot userDoc =
           await FirebaseFirestore.instance
