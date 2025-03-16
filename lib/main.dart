@@ -1,3 +1,4 @@
+// lib\main.dart
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobiletesting/View/home_student.dart';
 import 'package:mobiletesting/services/auth_service.dart';

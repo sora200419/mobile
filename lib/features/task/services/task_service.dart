@@ -51,7 +51,10 @@ class TaskService {
 
     return tasksCollection
         .where('requesterId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
+        .orderBy(
+          'createdAt',
+          descending: false,
+        ) // Change to ascending to match your index
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList();
@@ -64,7 +67,10 @@ class TaskService {
 
     return tasksCollection
         .where('providerId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
+        .orderBy(
+          'createdAt',
+          descending: false,
+        ) // Change to ascending to match your index
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList();
