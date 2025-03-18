@@ -1,15 +1,27 @@
-// lib/View/home_student.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
+
+// Auth
 import 'package:mobiletesting/services/auth_provider.dart';
+
+// Task related imports
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/services/rating_service.dart';
 import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:mobiletesting/features/task/views/task_rating_screen.dart';
-import 'package:intl/intl.dart';
+
+// Gamification imports
+import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:mobiletesting/features/gamification/constants/gamification_rules.dart';
+import 'package:mobiletesting/features/gamification/views/achievements_screen.dart';
+import 'package:mobiletesting/features/gamification/views/leaderboard_screen.dart';
+import 'package:mobiletesting/features/gamification/views/rewards_screen.dart';
+import 'package:mobiletesting/features/gamification/views/gamification_profile_screen.dart';
 
 class HomeStudent extends StatefulWidget {
   const HomeStudent({Key? key}) : super(key: key);
@@ -18,15 +30,32 @@ class HomeStudent extends StatefulWidget {
   State<HomeStudent> createState() => _HomeStudentState();
 }
 
-class _HomeStudentState extends State<HomeStudent> {
+class _HomeStudentState extends State<HomeStudent>
+    with SingleTickerProviderStateMixin {
   final TaskService _taskService = TaskService();
   final RatingService _ratingService = RatingService();
+  final GamificationService _gamificationService = GamificationService();
   final TextEditingController _searchController = TextEditingController();
+  late TabController _tabController;
   String _searchQuery = '';
+  bool _isGamificationPanelExpanded = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+
+    // Record user login for streak tracking
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _gamificationService.recordUserLogin(user.uid);
+    }
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -84,6 +113,9 @@ class _HomeStudentState extends State<HomeStudent> {
         ),
         body: Column(
           children: [
+            // Gamification Panel (Collapsible)
+            _buildGamificationPanel(),
+
             // Search bar
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -114,55 +146,6 @@ class _HomeStudentState extends State<HomeStudent> {
                   });
                 },
               ),
-            ),
-
-            // Points display with explanation
-            FutureBuilder<int>(
-              future: _taskService.getUserPoints(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const SizedBox.shrink();
-                }
-
-                int points = snapshot.data ?? 0;
-
-                return Tooltip(
-                  message:
-                      'Earn points by creating tasks, receiving good ratings, and completing tasks for others!',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 16,
-                    ),
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.stars, color: Colors.amber),
-                        const SizedBox(width: 8),
-                        Text(
-                          'My Points: $points',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.blue.shade700,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
             ),
 
             // Tab content
@@ -197,6 +180,288 @@ class _HomeStudentState extends State<HomeStudent> {
     );
   }
 
+  // Gamification Panel
+  Widget _buildGamificationPanel() {
+    return Card(
+      margin: const EdgeInsets.all(8.0),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          // Header with toggle button
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isGamificationPanelExpanded = !_isGamificationPanelExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'My Campus Profile',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Icon(
+                    _isGamificationPanelExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Collapsible content
+          if (_isGamificationPanelExpanded) ...[
+            const Divider(height: 1),
+
+            // User level and progress
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: FutureBuilder<UserProgress>(
+                future: _gamificationService.getUserProgress(
+                  FirebaseAuth.instance.currentUser?.uid ?? '',
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: SizedBox(
+                        height: 80,
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error loading profile: ${snapshot.error}'),
+                    );
+                  }
+
+                  final progress =
+                      snapshot.data ??
+                      UserProgress(
+                        userId: '',
+                        points: 0,
+                        level: 1,
+                        levelName: 'Newcomer',
+                        progressToNextLevel: 0.0,
+                        pointsToNextLevel: 50,
+                        rank: 0,
+                      );
+
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          // Level badge
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: _getLevelColor(progress.level),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${progress.level}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Level info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  progress.levelName,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Rank #${progress.rank > 0 ? progress.rank : '---'}',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Points
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.stars,
+                                  color: Colors.amber,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${progress.points}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Progress bar
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Progress to next level',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              Text(
+                                '${progress.pointsToNextLevel} points needed',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LinearProgressIndicator(
+                              value: progress.progressToNextLevel,
+                              minHeight: 8,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                _getLevelColor(progress.level),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // Gamification navigation buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 12.0,
+                horizontal: 6.0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildGamificationButton(
+                    icon: Icons.emoji_events,
+                    label: 'Achievements',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AchievementsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildGamificationButton(
+                    icon: Icons.leaderboard,
+                    label: 'Leaderboard',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LeaderboardScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildGamificationButton(
+                    icon: Icons.card_giftcard,
+                    label: 'Rewards',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RewardsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildGamificationButton(
+                    icon: Icons.person,
+                    label: 'Profile',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => const GamificationProfileScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGamificationButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.blue),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Build tab for available tasks
   Widget _buildAvailableTasks() {
     return _searchQuery.isEmpty
@@ -224,6 +489,86 @@ class _HomeStudentState extends State<HomeStudent> {
         }
 
         if (snapshot.hasError) {
+          // Check for Firestore index error
+          String errorMessage = snapshot.error.toString();
+          bool isFirestoreIndexError =
+              errorMessage.contains('failed-precondition') &&
+              errorMessage.contains('requires an index');
+
+          if (isFirestoreIndexError) {
+            // Extract the URL from the error message if possible
+            String indexUrl = '';
+            RegExp urlRegExp = RegExp(
+              r'https://console\.firebase\.google\.com/[^\s]+',
+            );
+            Match? match = urlRegExp.firstMatch(errorMessage);
+            if (match != null) {
+              indexUrl = match.group(0)!;
+            }
+
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Database Index Required',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'This feature requires an additional database index to be created.',
+                      style: TextStyle(fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Create Required Index'),
+                      onPressed: () async {
+                        if (indexUrl.isNotEmpty) {
+                          final Uri url = Uri.parse(indexUrl);
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(
+                              url,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Could not extract index URL from error message',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'After creating the index, return to this screen and refresh.',
+                      style: TextStyle(fontStyle: FontStyle.italic),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // Regular error display
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -675,5 +1020,27 @@ class _HomeStudentState extends State<HomeStudent> {
         ),
       ),
     );
+  }
+
+  // Helper method to get color based on user level
+  Color _getLevelColor(int level) {
+    switch (level) {
+      case 1:
+        return Colors.grey;
+      case 2:
+        return Colors.green;
+      case 3:
+        return Colors.blue;
+      case 4:
+        return Colors.purple;
+      case 5:
+        return Colors.orange;
+      case 6:
+        return Colors.red;
+      case 7:
+        return Colors.amber;
+      default:
+        return Colors.blue;
+    }
   }
 }
