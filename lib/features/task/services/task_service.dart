@@ -1,4 +1,4 @@
-// lib\features\task\services\task_service.dart
+// lib/features/task/services/task_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
@@ -10,6 +10,7 @@ class TaskService {
   // Points awarded for different activities
   static const int POINTS_CREATE_TASK = 5;
   static const int POINTS_COMPLETE_TASK = 10;
+  static const int POINTS_IN_TRANSIT = 3; // New points for starting delivery
   // Points for accepting a task will be based on the task's reward points
 
   // Collection references
@@ -51,10 +52,7 @@ class TaskService {
 
     return tasksCollection
         .where('requesterId', isEqualTo: userId)
-        .orderBy(
-          'createdAt',
-          descending: false,
-        ) // Change to ascending to match your index
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList();
@@ -67,10 +65,7 @@ class TaskService {
 
     return tasksCollection
         .where('providerId', isEqualTo: userId)
-        .orderBy(
-          'createdAt',
-          descending: false,
-        ) // Change to ascending to match your index
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList();
@@ -84,15 +79,8 @@ class TaskService {
       User? user = _auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
-      // Check if the user is a runner
-      DocumentSnapshot userDoc = await usersCollection.doc(user.uid).get();
-      String userRole = (userDoc.data() as Map<String, dynamic>)['role'] ?? '';
-
-      if (userRole != 'Runner') {
-        throw Exception('Only runners can accept tasks');
-      }
-
       // Get user name
+      DocumentSnapshot userDoc = await usersCollection.doc(user.uid).get();
       String userName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
 
       // Update task status
@@ -110,6 +98,41 @@ class TaskService {
       await _awardPoints(user.uid, task.rewardPoints);
     } catch (e) {
       print('Error accepting task: $e');
+      throw e;
+    }
+  }
+
+  // Mark task as in transit
+  Future<void> markTaskInTransit(String taskId) async {
+    try {
+      // Get task details to find provider
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      Map<String, dynamic> taskData = taskDoc.data() as Map<String, dynamic>;
+
+      String? providerId = taskData['providerId'];
+      if (providerId == null) {
+        throw Exception('Task does not have a provider assigned');
+      }
+
+      // Check if current user is the provider
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      if (currentUser.uid != providerId) {
+        throw Exception(
+          'Only the assigned runner can mark a task as in transit',
+        );
+      }
+
+      // Update task status
+      await tasksCollection.doc(taskId).update({'status': 'in_transit'});
+
+      // Award points to provider for starting delivery
+      await _awardPoints(providerId, POINTS_IN_TRANSIT);
+    } catch (e) {
+      print('Error marking task as in transit: $e');
       throw e;
     }
   }

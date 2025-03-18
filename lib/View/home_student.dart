@@ -304,21 +304,31 @@ class _HomeStudentState extends State<HomeStudent> {
 
     // Choose color based on status
     Color statusColor;
+    IconData statusIcon;
     switch (task.status) {
       case 'open':
         statusColor = Colors.green;
+        statusIcon = Icons.check_circle_outline;
         break;
       case 'assigned':
         statusColor = Colors.orange;
+        statusIcon = Icons.person;
+        break;
+      case 'in_transit':
+        statusColor = Colors.teal;
+        statusIcon = Icons.directions_run;
         break;
       case 'completed':
         statusColor = Colors.blue;
+        statusIcon = Icons.done_all;
         break;
       case 'cancelled':
         statusColor = Colors.red;
+        statusIcon = Icons.cancel;
         break;
       default:
         statusColor = Colors.grey;
+        statusIcon = Icons.help_outline;
     }
 
     return Card(
@@ -366,13 +376,20 @@ class _HomeStudentState extends State<HomeStudent> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: statusColor),
                     ),
-                    child: Text(
-                      task.status.toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 12, color: statusColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          task.status.toUpperCase(),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -486,8 +503,46 @@ class _HomeStudentState extends State<HomeStudent> {
                   ),
                 ),
 
+              // In transit status message
+              if (task.status == 'in_transit' &&
+                  (task.requesterId == FirebaseAuth.instance.currentUser?.uid ||
+                      task.providerId ==
+                          FirebaseAuth.instance.currentUser?.uid))
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.teal.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.directions_run,
+                        size: 14,
+                        color: Colors.teal.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Runner is on the way',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.teal.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Action buttons based on status and user role
-              if (task.status == 'assigned' &&
+              if ((task.status == 'assigned' || task.status == 'in_transit') &&
                   (task.requesterId == FirebaseAuth.instance.currentUser?.uid ||
                       task.providerId ==
                           FirebaseAuth.instance.currentUser?.uid))
@@ -520,7 +575,6 @@ class _HomeStudentState extends State<HomeStudent> {
                   ),
                 ),
 
-              // Rating button for completed tasks with check for existing rating
               if (task.status == 'completed' &&
                   (task.requesterId == FirebaseAuth.instance.currentUser?.uid ||
                       task.providerId ==

@@ -1,4 +1,4 @@
-// lib\features\task\views\task_detail_screen.dart
+// lib/features/task/views/task_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -184,6 +184,35 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
+  // Mark task as in transit
+  Future<void> _markInTransit() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _taskService.markTaskInTransit(widget.task!.id!);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Task marked as in transit'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+
+      // Refresh page
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   // Complete a task
   Future<void> _completeTask() async {
     setState(() {
@@ -351,6 +380,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ),
           const SizedBox(height: 32),
 
+          // Point explanation
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You will earn 5 points for creating this task, and additional points when the task is completed with good feedback!',
+                    style: TextStyle(color: Colors.blue.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
           // Create button
           SizedBox(
             width: double.infinity,
@@ -372,18 +423,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final task = widget.task!;
     final currentUserId = _auth.currentUser?.uid ?? '';
 
+    // Get user role
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userRole = authProvider.role;
 
     final bool isRequester = task.requesterId == currentUserId;
     final bool isProvider = task.providerId == currentUserId;
 
+    // Only runners can accept tasks, not students
     final bool canAccept =
-        task.status == 'open' && userRole == 'Runner' && !isRequester;
-    final bool canComplete =
-        task.status == 'assigned' && (isRequester || isProvider);
+        task.status == 'open' && !isRequester && userRole == 'Runner';
+
+    // Only the provider can mark a task as in transit, and only when it's assigned
+    final bool canMarkInTransit = task.status == 'assigned' && isProvider;
+
+    // Only the provider can mark a task as completed, and only when it's in transit
+    final bool canComplete = task.status == 'in_transit' && isProvider;
+
+    // Both provider and requester can cancel a task if it's not yet completed
     final bool canCancel =
-        (task.status == 'open' || task.status == 'assigned') &&
+        (task.status == 'open' ||
+            task.status == 'assigned' ||
+            task.status == 'in_transit') &&
         (isRequester || isProvider);
 
     return SingleChildScrollView(
@@ -514,6 +575,55 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           const Divider(),
           const SizedBox(height: 16),
 
+          // Role-specific information
+          if (userRole == 'Student' && task.status == 'open')
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This task is awaiting a runner to accept it. Only campus runners can accept tasks.',
+                      style: TextStyle(color: Colors.blue.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 16),
+
+          // Status explanation for in transit tasks
+          if (task.status == 'in_transit')
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.directions_run, color: Colors.teal.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This task is currently in progress! The runner is on their way.',
+                      style: TextStyle(color: Colors.teal.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Action buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -526,6 +636,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
+                ),
+
+              if (canMarkInTransit)
+                ElevatedButton.icon(
+                  onPressed: _markInTransit,
+                  icon: const Icon(Icons.directions_run),
+                  label: const Text('Start Delivery'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                 ),
 
               if (canComplete)
@@ -548,8 +666,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
           const SizedBox(height: 16),
 
-          // Chat button (only available if task is assigned)
-          if (task.status == 'assigned' && (isRequester || isProvider))
+          // Chat button (only available if task is assigned or in transit)
+          if ((task.status == 'assigned' || task.status == 'in_transit') &&
+              (isRequester || isProvider))
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -575,21 +694,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Widget _buildStatusBadge(String status) {
     Color color;
+    IconData icon;
+
     switch (status) {
       case 'open':
         color = Colors.green;
+        icon = Icons.check_circle_outline;
         break;
       case 'assigned':
         color = Colors.orange;
+        icon = Icons.person;
+        break;
+      case 'in_transit':
+        color = Colors.teal;
+        icon = Icons.directions_run;
         break;
       case 'completed':
         color = Colors.blue;
+        icon = Icons.done_all;
         break;
       case 'cancelled':
         color = Colors.red;
+        icon = Icons.cancel;
         break;
       default:
         color = Colors.grey;
+        icon = Icons.help_outline;
     }
 
     return Container(
@@ -599,9 +729,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color),
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            status.toUpperCase(),
+            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
     );
   }
