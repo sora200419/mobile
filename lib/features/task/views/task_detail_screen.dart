@@ -1,11 +1,14 @@
 // lib/features/task/views/task_detail_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
+import 'package:mobiletesting/features/task/views/location_tacking_screen.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 
@@ -34,6 +37,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   String _selectedCategory = 'Other';
 
   bool _isLoading = false;
+  bool _isLocationTrackingActive = false;
 
   // List of task categories
   final List<String> _categories = [
@@ -58,6 +62,30 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _rewardPointsController.text = widget.task!.rewardPoints.toString();
       _selectedDate = widget.task!.deadline;
       _selectedCategory = widget.task!.category;
+
+      // Check if location tracking is active for this task
+      if (widget.task!.status == 'in_transit') {
+        _checkLocationTrackingStatus();
+      }
+    }
+  }
+
+  Future<void> _checkLocationTrackingStatus() async {
+    if (widget.task == null || widget.task!.id == null) return;
+
+    try {
+      DatabaseEvent event =
+          await FirebaseDatabase.instance
+              .ref('taskTracking/${widget.task!.id}/active')
+              .once();
+
+      if (mounted) {
+        setState(() {
+          _isLocationTrackingActive = event.snapshot.value == true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking tracking status: $e');
     }
   }
 
@@ -622,6 +650,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                 ],
               ),
+            ),
+
+          // Live location tracking (only for in_transit tasks)
+          if (task.status == 'in_transit' && task.id != null)
+            Column(
+              children: [
+                const SizedBox(height: 16),
+                LocationTrackingView(taskId: task.id!, taskTitle: task.title),
+                const SizedBox(height: 24),
+              ],
             ),
 
           // Action buttons

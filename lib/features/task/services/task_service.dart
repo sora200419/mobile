@@ -5,9 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mobiletesting/features/gamification/constants/gamification_rules.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
+import 'package:mobiletesting/features/task/services/location_service.dart';
 
 class TaskService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GamificationService _gamificationService = GamificationService();
 
@@ -158,6 +158,10 @@ class TaskService {
       // Update task status
       await tasksCollection.doc(taskId).update({'status': 'in_transit'});
 
+      // Start location tracking
+      RunnerLocationService locationService = RunnerLocationService(providerId);
+      await locationService.startSharingLocation(taskId);
+
       // Award points to provider for starting delivery through gamification service
       await _gamificationService.awardPoints(
         providerId,
@@ -176,6 +180,14 @@ class TaskService {
       // Get task details
       DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
       Task task = Task.fromFirestore(taskDoc);
+
+      // Stop location tracking if active
+      if (task.providerId != null) {
+        RunnerLocationService locationService = RunnerLocationService(
+          task.providerId!,
+        );
+        await locationService.stopSharingLocation(taskId);
+      }
 
       // Update task status
       await tasksCollection.doc(taskId).update({'status': 'completed'});
@@ -215,6 +227,18 @@ class TaskService {
   // Cancel a task
   Future<void> cancelTask(String taskId) async {
     try {
+      // Get task details
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      Task task = Task.fromFirestore(taskDoc);
+
+      // Stop location tracking if task is in transit
+      if (task.status == 'in_transit' && task.providerId != null) {
+        RunnerLocationService locationService = RunnerLocationService(
+          task.providerId!,
+        );
+        await locationService.stopSharingLocation(taskId);
+      }
+
       await tasksCollection.doc(taskId).update({'status': 'cancelled'});
     } catch (e) {
       print('Error cancelling task: $e');

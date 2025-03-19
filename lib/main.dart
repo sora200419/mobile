@@ -1,10 +1,5 @@
 // lib\main.dart
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:mobiletesting/View/home_student.dart';
-import 'package:mobiletesting/services/auth_service.dart';
-// import 'package:firebase_core/firebase_core.dart';
-import 'package:mobiletesting/utils/theme/theme.dart';
-import 'app.dart'; // Make sure MyApp is defined in this file
 
 import 'package:mobiletesting/utils/constants/firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
@@ -19,12 +14,6 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await FirebaseAuth.instance.signOut();
-
-  // Todo: Add Widgets Binding
-  // Todo: Init Local Storage
-  // Todo: Await Native Splash
-  // Todo: Initialize Firebase
-  // Todo: Initialize Authentication
 
   runApp(
     MultiProvider(
