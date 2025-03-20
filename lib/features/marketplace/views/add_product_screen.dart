@@ -1,6 +1,5 @@
-// lib/features/marketplace/views/add_product_screen.dart
+// lib\features\marketplace\views\add_product_screen.dart
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,9 +19,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
 
   String _selectedCategory = 'Other';
-  File? _imageFile;
+  String _selectedCondition = Product.CONDITION_GOOD;
+  List<File> _imageFiles = [];
+  final int maxImages = 3; // Limit to 3 images for simplicity
   bool _isLoading = false;
 
   final List<String> _categories = [
@@ -33,11 +35,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
     'Other',
   ];
 
+  final List<String> _conditions = [
+    Product.CONDITION_NEW,
+    Product.CONDITION_LIKE_NEW,
+    Product.CONDITION_GOOD,
+    Product.CONDITION_FAIR,
+    Product.CONDITION_POOR,
+  ];
+
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
@@ -53,45 +64,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Image picker
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        height: 200,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child:
-                            _imageFile != null
-                                ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _imageFile!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                                : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.add_a_photo,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Add Product Photo',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                      ),
-                    ),
+                    // Image gallery picker
+                    _buildImageGallery(),
                     const SizedBox(height: 24),
 
                     // Title field
@@ -116,6 +90,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    // Location field
+                    TextField(
+                      controller: _locationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Location',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g., Campus Library, Engineering Building',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     // Category dropdown
                     DropdownButtonFormField<String>(
                       value: _selectedCategory,
@@ -133,6 +118,28 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       onChanged: (value) {
                         setState(() {
                           _selectedCategory = value!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Condition dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedCondition,
+                      decoration: const InputDecoration(
+                        labelText: 'Condition',
+                        border: OutlineInputBorder(),
+                      ),
+                      items:
+                          _conditions.map((condition) {
+                            return DropdownMenuItem<String>(
+                              value: condition,
+                              child: Text(condition),
+                            );
+                          }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCondition = value!;
                         });
                       },
                     ),
@@ -166,13 +173,112 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
+  Widget _buildImageGallery() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            'Product Photos (${_imageFiles.length}/$maxImages)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Container(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount:
+                _imageFiles.length < maxImages
+                    ? _imageFiles.length + 1
+                    : _imageFiles.length,
+            itemBuilder: (context, index) {
+              if (index == _imageFiles.length &&
+                  _imageFiles.length < maxImages) {
+                // Add image button
+                return GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: 100,
+                    margin: EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_a_photo, size: 32, color: Colors.grey),
+                        SizedBox(height: 4),
+                        Text(
+                          'Add Photo',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              } else {
+                // Image preview with delete option
+                return Stack(
+                  children: [
+                    Container(
+                      width: 100,
+                      margin: EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: FileImage(_imageFiles[index]),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 5,
+                      right: 13,
+                      child: GestureDetector(
+                        onTap: () => _removeImage(index),
+                        child: Container(
+                          padding: EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _imageFiles.removeAt(index);
+    });
+  }
+
   Future<void> _pickImage() async {
     final ImagePicker _picker = ImagePicker();
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
-    if (image != null) {
+    if (image != null && _imageFiles.length < maxImages) {
       setState(() {
-        _imageFile = File(image.path);
+        _imageFiles.add(File(image.path));
       });
     }
   }
@@ -182,10 +288,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (_titleController.text.isEmpty ||
         _descriptionController.text.isEmpty ||
         _priceController.text.isEmpty ||
-        _imageFile == null) {
+        _imageFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill all fields and add an image'),
+          content: Text('Please fill all fields and add at least one image'),
           backgroundColor: Colors.red,
         ),
       );
@@ -208,9 +314,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
 
     try {
-      // Upload image
-      String imageUrl = await _uploadImage();
-
       // Get user info
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('User not logged in');
@@ -229,14 +332,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
         description: _descriptionController.text,
         price: price,
         category: _selectedCategory,
+        condition: _selectedCondition,
         sellerId: user.uid,
         sellerName: userName,
-        imageUrl: imageUrl,
+        imageUrls: [], // Will be filled by the service
         createdAt: DateTime.now(),
+        location: _locationController.text,
       );
 
-      // Save to Firestore
-      await _marketplaceService.addProduct(product);
+      // Save to Firestore with images
+      await _marketplaceService.addProduct(product, _imageFiles);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -255,14 +360,5 @@ class _AddProductScreenState extends State<AddProductScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<String> _uploadImage() async {
-    final storageRef = FirebaseStorage.instance.ref();
-    final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}';
-    final imageRef = storageRef.child('product_images/$fileName');
-
-    await imageRef.putFile(_imageFile!);
-    return await imageRef.getDownloadURL();
   }
 }
