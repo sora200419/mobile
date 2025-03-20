@@ -1,5 +1,3 @@
-// lib/tabs/profile_tab.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +7,7 @@ import 'package:mobiletesting/features/gamification/services/gamification_servic
 import 'package:mobiletesting/features/gamification/views/achievements_screen.dart';
 import 'package:mobiletesting/features/gamification/views/leaderboard_screen.dart';
 import 'package:mobiletesting/features/gamification/views/rewards_screen.dart';
+import 'package:mobiletesting/utils/ui_utils.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({Key? key}) : super(key: key);
@@ -64,9 +63,6 @@ class _ProfileTabState extends State<ProfileTab> {
             },
           ),
 
-          // Gamification navigation
-          _buildGamificationNav(context),
-
           // Your Stats section
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -120,6 +116,28 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
               ],
             ),
+          ),
+
+          // Recent achievements section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Recent Achievements',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                _buildRecentAchievements(userId),
+              ],
+            ),
+          ),
+
+          // Gamification tabs
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: _buildGamificationNavigation(context),
           ),
 
           // Account section
@@ -210,7 +228,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: _getLevelColor(progress.level),
+                  color: UIUtils.getLevelColor(progress.level),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -296,7 +314,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         minHeight: 10,
                         backgroundColor: Colors.grey.shade200,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          _getLevelColor(progress.level),
+                          UIUtils.getLevelColor(progress.level),
                         ),
                       ),
                     ),
@@ -305,7 +323,7 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
               const SizedBox(width: 8),
               Text(
-                '${progress.pointsToNextLevel}',
+                '${progress.points}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -318,11 +336,12 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  // Gamification navigation
-  Widget _buildGamificationNav(BuildContext context) {
+  // Build gamification navigation tabs
+  Widget _buildGamificationNavigation(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(color: Colors.white),
+      width: double.infinity,
+      height: 80,
+      color: Colors.white,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -364,7 +383,7 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
           _buildNavButton(
             context,
-            icon: Icons.person,
+            icon: Icons.account_circle,
             label: 'Account',
             isSelected: true,
           ),
@@ -402,6 +421,103 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         ],
       ),
+    );
+  }
+
+  // Recent achievements widget
+  Widget _buildRecentAchievements(String userId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('achievements')
+              .where('userId', isEqualTo: userId)
+              .orderBy('awardedAt', descending: true)
+              .limit(3)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+        }
+
+        var achievements = snapshot.data?.docs ?? [];
+
+        if (achievements.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.emoji_events_outlined,
+                      size: 48,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No achievements yet',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Complete tasks and challenges to earn achievements',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children:
+              achievements.map((doc) {
+                Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+                String achievementId = data['achievementId'] ?? '';
+                DateTime awardedAt = (data['awardedAt'] as Timestamp).toDate();
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.amber,
+                      child: Icon(
+                        UIUtils.getIconForAchievement(achievementId),
+                        color: Colors.white,
+                      ),
+                    ),
+                    title: Text(_getAchievementName(achievementId)),
+                    subtitle: Text(
+                      'Earned on ${awardedAt.day}/${awardedAt.month}/${awardedAt.year}',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '+${_getAchievementPoints(achievementId)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber.shade800,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+        );
+      },
     );
   }
 
@@ -466,6 +582,45 @@ class _ProfileTabState extends State<ProfileTab> {
         ),
       ),
     );
+  }
+
+  // Helper methods for achievement data
+  String _getAchievementName(String achievementId) {
+    Map<String, String> achievements = {
+      'task_master': 'Task Master',
+      'speedy_delivery': 'Speedy Delivery',
+      'five_star': 'Five Star Service',
+      'trusted_partner': 'Trusted Partner',
+      'campus_explorer': 'Campus Explorer',
+      'early_bird': 'Early Bird',
+      'bookworm': 'Bookworm',
+      'tech_savvy': 'Tech Savvy',
+      'food_runner': 'Food Runner',
+      'perfect_week': 'Perfect Week',
+      'community_contributor': 'Community Contributor',
+      'loyal_user': 'Loyal User',
+    };
+
+    return achievements[achievementId] ?? 'Achievement';
+  }
+
+  int _getAchievementPoints(String achievementId) {
+    Map<String, int> points = {
+      'task_master': 20,
+      'speedy_delivery': 25,
+      'five_star': 30,
+      'trusted_partner': 30,
+      'campus_explorer': 25,
+      'early_bird': 20,
+      'bookworm': 15,
+      'tech_savvy': 15,
+      'food_runner': 15,
+      'perfect_week': 40,
+      'community_contributor': 20,
+      'loyal_user': 50,
+    };
+
+    return points[achievementId] ?? 0;
   }
 
   // Helper methods for profile stats
@@ -540,28 +695,6 @@ class _ProfileTabState extends State<ProfileTab> {
     } catch (e) {
       print('Error getting achievements count: $e');
       return '0';
-    }
-  }
-
-  // Get level color
-  Color _getLevelColor(int level) {
-    switch (level) {
-      case 1:
-        return Colors.grey;
-      case 2:
-        return Colors.green;
-      case 3:
-        return Colors.blue;
-      case 4:
-        return Colors.purple;
-      case 5:
-        return Colors.orange;
-      case 6:
-        return Colors.red;
-      case 7:
-        return Colors.amber;
-      default:
-        return Colors.blue;
     }
   }
 }

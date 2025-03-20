@@ -1,9 +1,8 @@
-// lib/tabs/tasks_tab.dart
-
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
+import 'package:mobiletesting/utils/ui_utils.dart';
 
 class TasksTab extends StatefulWidget {
   const TasksTab({Key? key}) : super(key: key);
@@ -186,36 +185,6 @@ class _TasksTabState extends State<TasksTab>
   }
 
   Widget _buildTaskCard(Task task) {
-    // Get color based on status
-    Color statusColor;
-    IconData statusIcon;
-
-    switch (task.status) {
-      case 'open':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle_outline;
-        break;
-      case 'assigned':
-        statusColor = Colors.orange;
-        statusIcon = Icons.person;
-        break;
-      case 'in_transit':
-        statusColor = Colors.teal;
-        statusIcon = Icons.directions_run;
-        break;
-      case 'completed':
-        statusColor = Colors.blue;
-        statusIcon = Icons.done_all;
-        break;
-      case 'cancelled':
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel;
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusIcon = Icons.help_outline;
-    }
-
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -250,32 +219,7 @@ class _TasksTabState extends State<TasksTab>
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: statusColor),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(statusIcon, size: 12, color: statusColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          task.status.toUpperCase(),
-                          style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  UIUtils.buildStatusBadge(task.status),
                 ],
               ),
               const SizedBox(height: 8),
