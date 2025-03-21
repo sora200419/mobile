@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mobiletesting/features/marketplace/models/product_model.dart';
 import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
 import 'package:mobiletesting/features/marketplace/views/chat_screen.dart';
+import 'package:mobiletesting/features/marketplace/views/payment_screen.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:intl/intl.dart';
 
@@ -20,14 +21,64 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final MarketplaceService _marketplaceService = MarketplaceService();
   int _currentImageIndex = 0;
   late Product _product;
+  bool _isFavorite = false;
+  bool _isLoadingFavorite = true;
 
   @override
   void initState() {
     super.initState();
     _product = widget.product;
-    // Increment view count
+
+    // Increment view count and check favorite status
     if (_product.id != null) {
       _marketplaceService.incrementViewCount(_product.id!);
+      _checkFavoriteStatus();
+    }
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    if (_product.id != null) {
+      bool isFav = await _marketplaceService.isProductFavorite(_product.id!);
+      setState(() {
+        _isFavorite = isFav;
+        _isLoadingFavorite = false;
+      });
+    } else {
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_product.id == null) return;
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      if (_isFavorite) {
+        await _marketplaceService.removeFromFavorites(_product.id!);
+      } else {
+        await _marketplaceService.addToFavorites(_product.id!);
+      }
+
+      setState(() {
+        _isFavorite = !_isFavorite;
+        _isLoadingFavorite = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating favorites: $e')));
+      setState(() {
+        _isLoadingFavorite = false;
+      });
     }
   }
 
@@ -71,86 +122,101 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Product Details'),
-        actions:
-            isOwner
-                ? [
-                  PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'mark_reserved') {
-                        await _marketplaceService.updateProductStatus(
-                          _product.id!,
-                          Product.STATUS_RESERVED,
-                        );
-                        setState(() {
-                          _product = _product.copyWith(
-                            status: Product.STATUS_RESERVED,
-                          );
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Marked as reserved')),
-                        );
-                      } else if (value == 'mark_sold') {
-                        await _marketplaceService.updateProductStatus(
-                          _product.id!,
-                          Product.STATUS_SOLD,
-                        );
-                        setState(() {
-                          _product = _product.copyWith(
-                            status: Product.STATUS_SOLD,
-                          );
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Marked as sold')),
-                        );
-                      } else if (value == 'mark_available') {
-                        await _marketplaceService.updateProductStatus(
-                          _product.id!,
-                          Product.STATUS_AVAILABLE,
-                        );
-                        setState(() {
-                          _product = _product.copyWith(
-                            status: Product.STATUS_AVAILABLE,
-                          );
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Marked as available')),
-                        );
-                      } else if (value == 'delete') {
-                        bool confirm = await _showDeleteConfirmation(context);
-                        if (confirm) {
-                          await _marketplaceService.deleteProduct(_product.id!);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Listing deleted')),
-                          );
-                          Navigator.pop(context);
-                        }
-                      }
-                    },
-                    itemBuilder:
-                        (BuildContext context) => <PopupMenuEntry<String>>[
-                          if (_product.status != Product.STATUS_RESERVED)
-                            const PopupMenuItem<String>(
-                              value: 'mark_reserved',
-                              child: Text('Mark as Reserved'),
-                            ),
-                          if (_product.status != Product.STATUS_SOLD)
-                            const PopupMenuItem<String>(
-                              value: 'mark_sold',
-                              child: Text('Mark as Sold'),
-                            ),
-                          if (_product.status != Product.STATUS_AVAILABLE)
-                            const PopupMenuItem<String>(
-                              value: 'mark_available',
-                              child: Text('Mark as Available'),
-                            ),
-                          const PopupMenuItem<String>(
-                            value: 'delete',
-                            child: Text('Delete Listing'),
-                          ),
-                        ],
+        actions: [
+          // Favorite button (only for non-owners)
+          if (!isOwner)
+            _isLoadingFavorite
+                ? Container(
+                  width: 48,
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
-                ]
-                : null,
+                )
+                : IconButton(
+                  icon: Icon(
+                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: _isFavorite ? Colors.red : null,
+                  ),
+                  onPressed: _toggleFavorite,
+                ),
+          // Owner actions
+          if (isOwner)
+            PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'mark_reserved') {
+                  await _marketplaceService.updateProductStatus(
+                    _product.id!,
+                    Product.STATUS_RESERVED,
+                  );
+                  setState(() {
+                    _product = _product.copyWith(
+                      status: Product.STATUS_RESERVED,
+                    );
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Marked as reserved')),
+                  );
+                } else if (value == 'mark_sold') {
+                  await _marketplaceService.updateProductStatus(
+                    _product.id!,
+                    Product.STATUS_SOLD,
+                  );
+                  setState(() {
+                    _product = _product.copyWith(status: Product.STATUS_SOLD);
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Marked as sold')),
+                  );
+                } else if (value == 'mark_available') {
+                  await _marketplaceService.updateProductStatus(
+                    _product.id!,
+                    Product.STATUS_AVAILABLE,
+                  );
+                  setState(() {
+                    _product = _product.copyWith(
+                      status: Product.STATUS_AVAILABLE,
+                    );
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Marked as available')),
+                  );
+                } else if (value == 'delete') {
+                  bool confirm = await _showDeleteConfirmation(context);
+                  if (confirm) {
+                    await _marketplaceService.deleteProduct(_product.id!);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Listing deleted')),
+                    );
+                    Navigator.pop(context);
+                  }
+                }
+              },
+              itemBuilder:
+                  (BuildContext context) => <PopupMenuEntry<String>>[
+                    if (_product.status != Product.STATUS_RESERVED)
+                      const PopupMenuItem<String>(
+                        value: 'mark_reserved',
+                        child: Text('Mark as Reserved'),
+                      ),
+                    if (_product.status != Product.STATUS_SOLD)
+                      const PopupMenuItem<String>(
+                        value: 'mark_sold',
+                        child: Text('Mark as Sold'),
+                      ),
+                    if (_product.status != Product.STATUS_AVAILABLE)
+                      const PopupMenuItem<String>(
+                        value: 'mark_available',
+                        child: Text('Mark as Available'),
+                      ),
+                    const PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Text('Delete Listing'),
+                    ),
+                  ],
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -320,6 +386,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           label: const Text('Make Offer'),
                           onPressed: () {
                             _showMakeOfferDialog(context);
+                          },
+                        ),
+                      ),
+                    ),
+
+                  // Buy Now button (if not owner)
+                  if (!isOwner && _product.status == Product.STATUS_AVAILABLE)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.shopping_cart),
+                          label: const Text('Buy Now'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) =>
+                                        PaymentScreen(product: _product),
+                              ),
+                            ).then((result) {
+                              if (result == true) {
+                                // Payment was successful
+                                setState(() {
+                                  _product = _product.copyWith(
+                                    status: Product.STATUS_SOLD,
+                                  );
+                                });
+                              }
+                            });
                           },
                         ),
                       ),

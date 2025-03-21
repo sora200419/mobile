@@ -228,4 +228,105 @@ class MarketplaceService {
               .toList();
         });
   }
+
+  // Add a product to favorites
+  Future<void> addToFavorites(String productId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('favorites')
+          .doc(productId)
+          .set({'addedAt': FieldValue.serverTimestamp()});
+    } catch (e) {
+      print('Error adding to favorites: $e');
+      throw e;
+    }
+  }
+
+  // Remove a product from favorites
+  Future<void> removeFromFavorites(String productId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('favorites')
+          .doc(productId)
+          .delete();
+    } catch (e) {
+      print('Error removing from favorites: $e');
+      throw e;
+    }
+  }
+
+  // Check if a product is in favorites
+  Future<bool> isProductFavorite(String productId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final doc =
+          await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('favorites')
+              .doc(productId)
+              .get();
+
+      return doc.exists;
+    } catch (e) {
+      print('Error checking favorite status: $e');
+      return false;
+    }
+  }
+
+  // Get all favorite products
+  Stream<List<Product>> getFavoriteProducts() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      // Return empty stream if no user is logged in
+      return Stream.value([]);
+    }
+
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('favorites')
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<String> productIds = snapshot.docs.map((doc) => doc.id).toList();
+
+          if (productIds.isEmpty) {
+            return [];
+          }
+
+          // Get products by chunks of 10 (Firestore limitation for whereIn)
+          List<Product> products = [];
+          for (int i = 0; i < productIds.length; i += 10) {
+            final endIdx =
+                i + 10 < productIds.length ? i + 10 : productIds.length;
+            final chunk = productIds.sublist(i, endIdx);
+
+            final querySnapshot =
+                await _firestore
+                    .collection('products')
+                    .where(FieldPath.documentId, whereIn: chunk)
+                    .get();
+
+            products.addAll(
+              querySnapshot.docs
+                  .map((doc) => Product.fromFirestore(doc))
+                  .toList(),
+            );
+          }
+
+          return products;
+        });
+  }
 }

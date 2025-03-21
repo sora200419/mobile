@@ -664,6 +664,34 @@ class GamificationService {
       print('Error checking weekly perfect completion: $e');
     }
   }
+
+  // Public method for unlocking achievements - to be used by other services
+  Future<void> unlockAchievement(
+    String userId,
+    String achievementId,
+    String achievementName,
+  ) async {
+    try {
+      // Check if user already has this achievement
+      List<String> currentAchievements = await getUserAchievements(userId);
+      if (currentAchievements.contains(achievementId)) {
+        // Already has achievement, nothing to do
+        return;
+      }
+
+      // Award the achievement using the private method
+      await _awardAchievement(userId, achievementId);
+
+      // Record a more descriptive activity
+      await _recordActivity(
+        userId,
+        'achievement',
+        'Earned achievement: $achievementName',
+      );
+    } catch (e) {
+      print('Error unlocking achievement: $e');
+    }
+  }
 }
 
 // User progress data model

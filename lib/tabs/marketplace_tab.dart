@@ -1,8 +1,10 @@
+// lib/tabs/marketplace_tab.dart
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/marketplace/models/product_model.dart';
 import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
 import 'package:mobiletesting/features/marketplace/views/product_detail_screen.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
+import 'package:mobiletesting/features/marketplace/views/favorites_screen.dart';
 
 class MarketplaceTab extends StatefulWidget {
   const MarketplaceTab({Key? key}) : super(key: key);
@@ -20,7 +22,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
   String _searchQuery = '';
   String _selectedCategory = 'All';
   bool _showFilters = false;
-  RangeValues _priceRange = RangeValues(0, 1000);
+  RangeValues _priceRange = RangeValues(0, 500);
   String _selectedCondition = 'All';
   String _sortBy = 'Newest';
 
@@ -46,13 +48,12 @@ class _MarketplaceTabState extends State<MarketplaceTab>
     'Newest',
     'Price: Low to High',
     'Price: High to Low',
-    'Most Viewed',
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -77,10 +78,10 @@ class _MarketplaceTabState extends State<MarketplaceTab>
       ),
       body: Column(
         children: [
-          // Search bar
+          // Search and filter bar
           _buildSearchBar(),
 
-          // Category chips
+          // Category selection
           _buildCategoryChips(),
 
           // Filter section (expandable)
@@ -92,7 +93,11 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             labelColor: Colors.deepPurple,
             unselectedLabelColor: Colors.grey,
             indicatorColor: Colors.deepPurple,
-            tabs: const [Tab(text: "Browse"), Tab(text: "My Listings")],
+            tabs: const [
+              Tab(text: "Browse"),
+              Tab(text: "My Listings"),
+              Tab(text: "Favorites"),
+            ],
           ),
 
           // Tab content
@@ -105,6 +110,9 @@ class _MarketplaceTabState extends State<MarketplaceTab>
 
                 // My Listings Tab
                 _buildProductGrid(_marketplaceService.getMyProducts()),
+
+                // Favorites Tab
+                _buildProductGrid(_marketplaceService.getFavoriteProducts()),
               ],
             ),
           ),
@@ -210,7 +218,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
         children: [
           // Price Range Slider
           const Text(
-            'Price Range',
+            'Price Range (RM)',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           Row(
@@ -223,8 +231,8 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                 child: RangeSlider(
                   values: _priceRange,
                   min: 0,
-                  max: 1000,
-                  divisions: 100,
+                  max: 500,
+                  divisions: 50,
                   labels: RangeLabels(
                     'RM ${_priceRange.start.toInt()}',
                     'RM ${_priceRange.end.toInt()}',
@@ -312,7 +320,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
               OutlinedButton(
                 onPressed: () {
                   setState(() {
-                    _priceRange = RangeValues(0, 1000);
+                    _priceRange = RangeValues(0, 500);
                     _selectedCondition = 'All';
                     _sortBy = 'Newest';
                     _selectedCategory = 'All';
@@ -369,7 +377,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
 
         List<Product> products = snapshot.data ?? [];
 
-        // Apply filters if they're set
+        // Apply additional filters
         if (_selectedCondition != 'All') {
           products =
               products.where((p) => p.condition == _selectedCondition).toList();
@@ -394,9 +402,6 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             break;
           case 'Price: High to Low':
             products.sort((a, b) => b.price.compareTo(a.price));
-            break;
-          case 'Most Viewed':
-            products.sort((a, b) => b.viewCount.compareTo(a.viewCount));
             break;
         }
 
@@ -503,22 +508,15 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                             ),
                           ),
                           if (product.location.isNotEmpty)
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 12,
+                            Flexible(
+                              child: Text(
+                                product.location,
+                                style: TextStyle(
+                                  fontSize: 10,
                                   color: Colors.grey,
                                 ),
-                                Text(
-                                  product.location,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                         ],
                       ),
@@ -527,7 +525,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                 ),
               ],
             ),
-            // Status label
+            // Status label for reserved or sold items
             if (product.status != Product.STATUS_AVAILABLE)
               Positioned(
                 top: 0,
@@ -550,9 +548,55 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                   ),
                 ),
               ),
+            // Favorite button (only shown in Browse tab)
+            if (_tabController.index == 0)
+              Positioned(
+                top: 5,
+                right: 5,
+                child: StreamBuilder<bool>(
+                  stream: _buildFavoriteStream(product.id),
+                  builder: (context, snapshot) {
+                    bool isFavorite = snapshot.data ?? false;
+                    return CircleAvatar(
+                      radius: 15,
+                      backgroundColor: Colors.white.withOpacity(0.7),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? Colors.red : Colors.grey,
+                          size: 18,
+                        ),
+                        onPressed:
+                            () => _toggleFavorite(product.id!, isFavorite),
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Stream<bool> _buildFavoriteStream(String? productId) {
+    if (productId == null) return Stream.value(false);
+
+    return Stream.fromFuture(_marketplaceService.isProductFavorite(productId));
+  }
+
+  Future<void> _toggleFavorite(String productId, bool isFavorite) async {
+    try {
+      if (isFavorite) {
+        await _marketplaceService.removeFromFavorites(productId);
+      } else {
+        await _marketplaceService.addToFavorites(productId);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating favorites: $e')));
+    }
   }
 }
