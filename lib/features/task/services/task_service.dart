@@ -1,16 +1,15 @@
-// lib\features\task\services\task_service.dart
+// lib/features/task/services/task_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:mobiletesting/features/gamification/constants/gamification_rules.dart';
+import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
+import 'package:mobiletesting/features/task/services/location_service.dart';
 
 class TaskService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  // Points awarded for different activities
-  static const int POINTS_CREATE_TASK = 5;
-  static const int POINTS_COMPLETE_TASK = 10;
-  // Points for accepting a task will be based on the task's reward points
+  final GamificationService _gamificationService = GamificationService();
 
   // Collection references
   final CollectionReference tasksCollection = FirebaseFirestore.instance
@@ -24,8 +23,18 @@ class TaskService {
       // Add task to Firestore
       DocumentReference docRef = await tasksCollection.add(task.toMap());
 
-      // Award points to the user for creating a task
-      await _awardPoints(task.requesterId, POINTS_CREATE_TASK);
+      // Award points to the user for creating a task through the gamification service
+      await _gamificationService.awardPoints(
+        task.requesterId,
+        GamificationRules.POINTS_CREATE_TASK,
+        'create_task',
+      );
+
+      // Award first task of day bonus if applicable
+      await _gamificationService.awardFirstTaskOfDayPoints(
+        task.requesterId,
+        'create_task',
+      );
 
       return docRef.id;
     } catch (e) {
@@ -51,10 +60,7 @@ class TaskService {
 
     return tasksCollection
         .where('requesterId', isEqualTo: userId)
-        .orderBy(
-          'createdAt',
-          descending: false,
-        ) // Change to ascending to match your index
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList();
@@ -67,10 +73,7 @@ class TaskService {
 
     return tasksCollection
         .where('providerId', isEqualTo: userId)
-        .orderBy(
-          'createdAt',
-          descending: false,
-        ) // Change to ascending to match your index
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList();
@@ -84,16 +87,13 @@ class TaskService {
       User? user = _auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
-      // Check if the user is a runner
-      DocumentSnapshot userDoc = await usersCollection.doc(user.uid).get();
-      String userRole = (userDoc.data() as Map<String, dynamic>)['role'] ?? '';
-
-      if (userRole != 'Runner') {
-        throw Exception('Only runners can accept tasks');
-      }
-
       // Get user name
+      DocumentSnapshot userDoc = await usersCollection.doc(user.uid).get();
       String userName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
+
+      // Get task creation time to check for quick acceptance
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      Task task = Task.fromFirestore(taskDoc);
 
       // Update task status
       await tasksCollection.doc(taskId).update({
@@ -102,14 +102,74 @@ class TaskService {
         'status': 'assigned',
       });
 
-      // Get task details for reward points
-      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
-      Task task = Task.fromFirestore(taskDoc);
-
       // Award points for accepting a task based on task's reward points
-      await _awardPoints(user.uid, task.rewardPoints);
+      await _gamificationService.awardPoints(
+        user.uid,
+        task.rewardPoints,
+        'accept_task',
+      );
+
+      // Award quick acceptance bonus if applicable
+      DateTime createdAt = task.createdAt;
+      DateTime now = DateTime.now();
+      if (now.difference(createdAt).inMinutes <= 30) {
+        await _gamificationService.awardPoints(
+          user.uid,
+          GamificationRules.POINTS_QUICK_ACCEPTANCE,
+          'quick_acceptance',
+        );
+      }
+
+      // Award first task of day bonus if applicable
+      await _gamificationService.awardFirstTaskOfDayPoints(
+        user.uid,
+        'accept_task',
+      );
     } catch (e) {
       print('Error accepting task: $e');
+      throw e;
+    }
+  }
+
+  // Mark task as in transit
+  Future<void> markTaskInTransit(String taskId) async {
+    try {
+      // Get task details to find provider
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      Map<String, dynamic> taskData = taskDoc.data() as Map<String, dynamic>;
+
+      String? providerId = taskData['providerId'];
+      if (providerId == null) {
+        throw Exception('Task does not have a provider assigned');
+      }
+
+      // Check if current user is the provider
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      if (currentUser.uid != providerId) {
+        throw Exception(
+          'Only the assigned runner can mark a task as in transit',
+        );
+      }
+
+      // Update task status
+      await tasksCollection.doc(taskId).update({'status': 'in_transit'});
+
+      // Start location tracking
+      RunnerLocationService locationService = RunnerLocationService(providerId);
+      await locationService.startSharingLocation(taskId);
+
+      // Award points to provider for starting delivery through gamification service
+      await _gamificationService.awardPoints(
+        providerId,
+        GamificationRules.POINTS_IN_TRANSIT,
+        'task_in_transit',
+      );
+    } catch (e) {
+      print('Error marking task as in transit: $e');
       throw e;
     }
   }
@@ -117,18 +177,46 @@ class TaskService {
   // Mark task as completed
   Future<void> completeTask(String taskId) async {
     try {
-      // Get task details to find provider
+      // Get task details
       DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
-      Map<String, dynamic> taskData = taskDoc.data() as Map<String, dynamic>;
+      Task task = Task.fromFirestore(taskDoc);
 
-      String? providerId = taskData['providerId'];
+      // Stop location tracking if active
+      if (task.providerId != null) {
+        RunnerLocationService locationService = RunnerLocationService(
+          task.providerId!,
+        );
+        await locationService.stopSharingLocation(taskId);
+      }
 
       // Update task status
       await tasksCollection.doc(taskId).update({'status': 'completed'});
 
       // Award points to provider for completing task
-      if (providerId != null) {
-        await _awardPoints(providerId, POINTS_COMPLETE_TASK);
+      if (task.providerId != null) {
+        await _gamificationService.awardPoints(
+          task.providerId!,
+          GamificationRules.POINTS_COMPLETE_TASK_PROVIDER,
+          'complete_task_provider',
+        );
+
+        // Award points to requester for task completion
+        await _gamificationService.awardPoints(
+          task.requesterId,
+          GamificationRules.POINTS_COMPLETE_TASK_REQUESTER,
+          'complete_task_requester',
+        );
+
+        // Check for early completion bonus
+        await _gamificationService.awardEarlyCompletionPoints(
+          taskId,
+          task.providerId!,
+        );
+
+        // Check for perfect week completion
+        await _gamificationService.checkWeeklyPerfectCompletion(
+          task.providerId!,
+        );
       }
     } catch (e) {
       print('Error completing task: $e');
@@ -139,6 +227,18 @@ class TaskService {
   // Cancel a task
   Future<void> cancelTask(String taskId) async {
     try {
+      // Get task details
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      Task task = Task.fromFirestore(taskDoc);
+
+      // Stop location tracking if task is in transit
+      if (task.status == 'in_transit' && task.providerId != null) {
+        RunnerLocationService locationService = RunnerLocationService(
+          task.providerId!,
+        );
+        await locationService.stopSharingLocation(taskId);
+      }
+
       await tasksCollection.doc(taskId).update({'status': 'cancelled'});
     } catch (e) {
       print('Error cancelling task: $e');
@@ -165,24 +265,6 @@ class TaskService {
     });
   }
 
-  // Award points to a user
-  Future<void> _awardPoints(String userId, int points) async {
-    try {
-      // Get current points
-      DocumentSnapshot userDoc = await usersCollection.doc(userId).get();
-      int currentPoints =
-          (userDoc.data() as Map<String, dynamic>)['points'] ?? 0;
-
-      // Update points
-      await usersCollection.doc(userId).update({
-        'points': currentPoints + points,
-      });
-    } catch (e) {
-      print('Error awarding points: $e');
-      // Don't throw here to avoid disrupting the main flow if points can't be awarded
-    }
-  }
-
   // Get user's points
   Future<int> getUserPoints() async {
     try {
@@ -199,7 +281,7 @@ class TaskService {
 
   // Get task by status
   Stream<List<Task>> getTasksByStatus(String status) {
-    return _firestore
+    return FirebaseFirestore.instance
         .collection('tasks')
         .where('status', isEqualTo: status)
         .snapshots()

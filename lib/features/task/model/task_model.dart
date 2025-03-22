@@ -1,4 +1,4 @@
-// lib\features\task\model\task_model.dart
+// lib/features/task/model/task_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Task {
@@ -12,7 +12,8 @@ class Task {
   final String location;
   final int rewardPoints;
   final DateTime deadline;
-  final String status; // 'open', 'assigned', 'completed', 'cancelled'
+  final String
+  status; // 'open', 'assigned', 'in_transit', 'completed', 'cancelled'
   final DateTime createdAt;
   final String category; // e.g., 'delivery', 'printing', 'tutoring', etc.
 
