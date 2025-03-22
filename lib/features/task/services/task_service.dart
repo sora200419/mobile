@@ -196,4 +196,16 @@ class TaskService {
       return 0;
     }
   }
+
+  // Get task by status
+  Stream<List<Task>> getTasksByStatus(String status) {
+    return _firestore
+        .collection('tasks')
+        .where('status', isEqualTo: status)
+        .snapshots()
+        .map(
+          (snapshot) =>
+          snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList(),
+    );
+  }
 }

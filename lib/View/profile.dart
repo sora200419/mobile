@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
+import 'package:mobiletesting/features/task/model/task_model.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -14,12 +16,63 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreen extends State<ProfileScreen> {
   String username = "";
-  String status = "Briefly introduce yourself!"; // todo: read from firestore
+  String signature = "Briefly introduce yourself!";
+
+  File? _image;
+  String? _imageUrl;
+  final String userId = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   void initState() {
     super.initState();
     _loadUsername();
+    _loadProfilePicture();
+  }
+
+  // todo: complete profile edit
+
+  Future<void> _pickImage() async {
+    final pickedFile = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+    );
+    if (pickedFile == null) {
+      return;
+    }
+
+    File imageFile = File(pickedFile.path);
+
+    try {
+      // upload image to Firebase Storage
+      Reference ref = FirebaseStorage.instance.ref().child(
+        'profilePicture/$userId.jpg',
+      );
+      await ref.putFile(imageFile);
+
+      // get download URL
+      String downloadURL = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'profilePicture': downloadURL,
+      }, SetOptions(merge: true));
+
+      setState(() {
+        _image = imageFile;
+        _imageUrl = downloadURL;
+      });
+    } catch (e) {
+      print("Error uploading image: $e");
+    }
+  }
+
+  Future<void> _loadProfilePicture() async {
+    DocumentSnapshot userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+
+    if (userDoc.exists) {
+      setState(() {
+        _imageUrl = userDoc['profilePicture'];
+      });
+    }
   }
 
   Future<void> _loadUsername() async {
@@ -37,8 +90,8 @@ class _ProfileScreen extends State<ProfileScreen> {
         TextEditingController nameController = TextEditingController(
           text: username,
         );
-        TextEditingController statusController = TextEditingController(
-          text: status,
+        TextEditingController signatureController = TextEditingController(
+          text: signature,
         );
 
         return AlertDialog(
@@ -51,8 +104,14 @@ class _ProfileScreen extends State<ProfileScreen> {
                 decoration: InputDecoration(labelText: "Username"),
               ),
               TextField(
-                controller: statusController,
-                decoration: InputDecoration(labelText: "Status"),
+                controller: signatureController,
+                decoration: InputDecoration(labelText: "Signature"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  _pickImage();
+                },
+                child: Text("Change Profile Picture"),
               ),
             ],
           ),
@@ -62,11 +121,17 @@ class _ProfileScreen extends State<ProfileScreen> {
               child: Text("Cancel"),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                String newUsername =
+                    nameController.text; // todo: rewrite firestore data
+                String newSignature = signatureController.text;
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(userId)
+                    .update({'name': newUsername, 'signature': newSignature});
                 setState(() {
-                  username =
-                      nameController.text; // todo: rewrite firestore data
-                  status = statusController.text;
+                  username = newUsername;
+                  signature = newSignature;
                 });
                 Navigator.pop(context);
               },
@@ -98,7 +163,9 @@ class _ProfileScreen extends State<ProfileScreen> {
                       builder: (context) {
                         return Dialog(
                           child: InteractiveViewer(
-                            child: Image.asset('assets/profile.jpg'),
+                            child: Image.asset(
+                              'assets/profile.jpg',
+                            ), // todo: user profile pic
                           ),
                         );
                       },
@@ -106,7 +173,10 @@ class _ProfileScreen extends State<ProfileScreen> {
                   },
                   child: CircleAvatar(
                     radius: 60,
-                    backgroundImage: AssetImage('assets/profile.jpg'),
+                    backgroundImage:
+                        _imageUrl != null
+                            ? NetworkImage(_imageUrl!)
+                            : AssetImage('assets/profile.jpg'),
                   ),
                 ),
                 SizedBox(width: 16),
@@ -122,7 +192,7 @@ class _ProfileScreen extends State<ProfileScreen> {
                         ),
                       ),
                       Text(
-                        status,
+                        signature,
                         style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     ],
