@@ -6,6 +6,7 @@ import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
+import 'package:mobiletesting/View/task_details.dart';
 
 class HomeRunner extends StatefulWidget {
   @override
@@ -54,8 +55,12 @@ class _HomeRunnerState extends State<HomeRunner> {
         body: TabBarView(
           children: [
             TaskListWidget(taskStream: TaskService().getTasksByStatus("open")),
-            TaskListWidget(taskStream: TaskService().getTasksByStatus("awaiting")),
-            TaskListWidget(taskStream: TaskService().getTasksByStatus("inTransit")),
+            TaskListWidget(
+              taskStream: TaskService().getTasksByStatus("assigned"),
+            ),
+            TaskListWidget(
+              taskStream: TaskService().getTasksByStatus("in_transit"),
+            ),
           ],
         ),
         bottomNavigationBar: BottomNavigationBar(
@@ -71,8 +76,6 @@ class _HomeRunnerState extends State<HomeRunner> {
   }
 }
 
-// Todo: 改card变好看
-
 class TaskListWidget extends StatelessWidget {
   final Stream<List<Task>> taskStream;
 
@@ -87,26 +90,102 @@ class TaskListWidget extends StatelessWidget {
           return Center(child: CircularProgressIndicator());
         }
 
-        List<Task> tasks =
-            snapshot.data!.where((task) => task.status == "open").toList();
+        List<Task> tasks = snapshot.data!;
 
         if (tasks.isEmpty) {
-          return Center(child: Text("No available task"));
+          return Center(child: Text("No tasks"));
         }
 
         return ListView.builder(
           itemCount: tasks.length,
           itemBuilder: (context, index) {
             Task task = tasks[index];
-            return Card(
-              margin: EdgeInsets.all(10),
-              child: ListTile(
-                title: Text(task.title),
-                subtitle: Text(task.description),
-                trailing: Text("Points: ${task.rewardPoints}"),
-                onTap: () {
-                  // Todo: navigate to detail
-                },
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TaskDetailsPage(task: task),
+                  ),
+                );
+              },
+              child: Card(
+                margin: EdgeInsets.all(8),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            task.title,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Color(0xFFECF0ED),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.green, width: 1), // 绿色边框
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  color: Colors.green,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  task.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        task.description,
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 16, color: Colors.grey),
+                          SizedBox(width: 4),
+                          Text(
+                            task.location,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          Spacer(),
+                          Icon(Icons.star, size: 16, color: Colors.amber),
+                          SizedBox(width: 4),
+                          Text(
+                            "${task.rewardPoints} points",
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           },
