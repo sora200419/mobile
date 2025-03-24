@@ -11,6 +11,8 @@ import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
+import 'package:mobiletesting/utils/ui_utils.dart';
+import 'package:mobiletesting/utils/formatting_utils.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final bool isCreating;
@@ -483,7 +485,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           // Status badge
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
-            children: [_buildStatusBadge(task.status)],
+            children: [UIUtils.buildStatusBadge(task.status)],
           ),
           const SizedBox(height: 8),
 
@@ -559,7 +561,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             children: [
               const Icon(Icons.calendar_today, color: Colors.blue),
               const SizedBox(width: 8),
-              Text(DateFormat('dd/MM/yyyy').format(task.deadline)),
+              Text(FormattingUtils.formatDate(task.deadline)),
             ],
           ),
           const SizedBox(height: 16),
@@ -657,7 +659,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             Column(
               children: [
                 const SizedBox(height: 16),
-                LocationTrackingView(taskId: task.id!, taskTitle: task.title),
+                _isLocationTrackingActive
+                    ? LocationTrackingView(
+                      taskId: task.id!,
+                      taskTitle: task.title,
+                    )
+                    : Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.location_disabled,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Location tracking is not active for this task.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
                 const SizedBox(height: 24),
               ],
             ),
@@ -725,57 +747,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    IconData icon;
-
-    switch (status) {
-      case 'open':
-        color = Colors.green;
-        icon = Icons.check_circle_outline;
-        break;
-      case 'assigned':
-        color = Colors.orange;
-        icon = Icons.person;
-        break;
-      case 'in_transit':
-        color = Colors.teal;
-        icon = Icons.directions_run;
-        break;
-      case 'completed':
-        color = Colors.blue;
-        icon = Icons.done_all;
-        break;
-      case 'cancelled':
-        color = Colors.red;
-        icon = Icons.cancel;
-        break;
-      default:
-        color = Colors.grey;
-        icon = Icons.help_outline;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 4),
-          Text(
-            status.toUpperCase(),
-            style: TextStyle(color: color, fontWeight: FontWeight.bold),
-          ),
         ],
       ),
     );
