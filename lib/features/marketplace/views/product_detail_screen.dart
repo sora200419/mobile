@@ -1,11 +1,9 @@
+// lib/features/marketplace/views/product_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mobiletesting/features/marketplace/models/product_model.dart';
-import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
-import 'package:mobiletesting/features/marketplace/views/chat_screen.dart';
-import 'package:mobiletesting/features/marketplace/views/payment_screen.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:intl/intl.dart';
+import '../models/product_model.dart';
+import '../services/marketplace_service.dart';
+import 'edit_product_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -19,520 +17,98 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final MarketplaceService _marketplaceService = MarketplaceService();
-  int _currentImageIndex = 0;
-  late Product _product;
   bool _isFavorite = false;
-  bool _isLoadingFavorite = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _product = widget.product;
-
-    // Increment view count and check favorite status
-    if (_product.id != null) {
-      _marketplaceService.incrementViewCount(_product.id!);
-      _checkFavoriteStatus();
-    }
+    _checkFavoriteStatus();
   }
 
   Future<void> _checkFavoriteStatus() async {
-    setState(() {
-      _isLoadingFavorite = true;
-    });
-
-    if (_product.id != null) {
-      bool isFav = await _marketplaceService.isProductFavorite(_product.id!);
-      setState(() {
-        _isFavorite = isFav;
-        _isLoadingFavorite = false;
-      });
-    } else {
-      setState(() {
-        _isLoadingFavorite = false;
-      });
+    if (widget.product.id != null) {
+      setState(() => _isLoading = true);
+      try {
+        bool isFavorite = await _marketplaceService.isProductFavorite(
+          widget.product.id!,
+        );
+        setState(() => _isFavorite = isFavorite);
+      } catch (e) {
+        // Handle error
+        print('Error checking favorite status: $e');
+      } finally {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _toggleFavorite() async {
-    if (_product.id == null) return;
+    if (widget.product.id == null) return;
 
-    setState(() {
-      _isLoadingFavorite = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       if (_isFavorite) {
-        await _marketplaceService.removeFromFavorites(_product.id!);
+        await _marketplaceService.removeFromFavorites(widget.product.id!);
       } else {
-        await _marketplaceService.addToFavorites(_product.id!);
+        await _marketplaceService.addToFavorites(widget.product.id!);
       }
-
-      setState(() {
-        _isFavorite = !_isFavorite;
-        _isLoadingFavorite = false;
-      });
+      setState(() => _isFavorite = !_isFavorite);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error updating favorites: $e')));
-      setState(() {
-        _isLoadingFavorite = false;
-      });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  // Get status color
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case Product.STATUS_AVAILABLE:
-        return Colors.green;
-      case Product.STATUS_RESERVED:
-        return Colors.orange;
-      case Product.STATUS_SOLD:
-        return Colors.red;
-      default:
-        return Colors.green;
-    }
-  }
+  Future<void> _updateProductStatus(String status) async {
+    if (widget.product.id == null) return;
 
-  // Get condition color
-  Color _getConditionColor(String condition) {
-    switch (condition) {
-      case Product.CONDITION_NEW:
-        return Colors.teal;
-      case Product.CONDITION_LIKE_NEW:
-        return Colors.blue;
-      case Product.CONDITION_GOOD:
-        return Colors.green;
-      case Product.CONDITION_FAIR:
-        return Colors.orange;
-      case Product.CONDITION_POOR:
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isOwner =
-        FirebaseAuth.instance.currentUser?.uid == _product.sellerId;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Product Details'),
-        actions: [
-          // Favorite button (only for non-owners)
-          if (!isOwner)
-            _isLoadingFavorite
-                ? Container(
-                  width: 48,
-                  padding: EdgeInsets.all(12),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-                : IconButton(
-                  icon: Icon(
-                    _isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: _isFavorite ? Colors.red : null,
-                  ),
-                  onPressed: _toggleFavorite,
-                ),
-          // Owner actions
-          if (isOwner)
-            PopupMenuButton<String>(
-              onSelected: (value) async {
-                if (value == 'mark_reserved') {
-                  await _marketplaceService.updateProductStatus(
-                    _product.id!,
-                    Product.STATUS_RESERVED,
-                  );
-                  setState(() {
-                    _product = _product.copyWith(
-                      status: Product.STATUS_RESERVED,
-                    );
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Marked as reserved')),
-                  );
-                } else if (value == 'mark_sold') {
-                  await _marketplaceService.updateProductStatus(
-                    _product.id!,
-                    Product.STATUS_SOLD,
-                  );
-                  setState(() {
-                    _product = _product.copyWith(status: Product.STATUS_SOLD);
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Marked as sold')),
-                  );
-                } else if (value == 'mark_available') {
-                  await _marketplaceService.updateProductStatus(
-                    _product.id!,
-                    Product.STATUS_AVAILABLE,
-                  );
-                  setState(() {
-                    _product = _product.copyWith(
-                      status: Product.STATUS_AVAILABLE,
-                    );
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Marked as available')),
-                  );
-                } else if (value == 'delete') {
-                  bool confirm = await _showDeleteConfirmation(context);
-                  if (confirm) {
-                    await _marketplaceService.deleteProduct(_product.id!);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Listing deleted')),
-                    );
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              itemBuilder:
-                  (BuildContext context) => <PopupMenuEntry<String>>[
-                    if (_product.status != Product.STATUS_RESERVED)
-                      const PopupMenuItem<String>(
-                        value: 'mark_reserved',
-                        child: Text('Mark as Reserved'),
-                      ),
-                    if (_product.status != Product.STATUS_SOLD)
-                      const PopupMenuItem<String>(
-                        value: 'mark_sold',
-                        child: Text('Mark as Sold'),
-                      ),
-                    if (_product.status != Product.STATUS_AVAILABLE)
-                      const PopupMenuItem<String>(
-                        value: 'mark_available',
-                        child: Text('Mark as Available'),
-                      ),
-                    const PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Text('Delete Listing'),
-                    ),
-                  ],
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Status banner
-            if (_product.status != Product.STATUS_AVAILABLE)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                color: _getStatusColor(_product.status),
-                child: Text(
-                  _product.status,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-            // Product image carousel
-            _buildImageCarousel(),
-
-            // Product details
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title and price
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _product.title,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        'RM ${_product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Category and condition
-                  Row(
-                    children: [
-                      Chip(
-                        label: Text(_product.category),
-                        backgroundColor: Colors.deepPurple.shade50,
-                      ),
-                      const SizedBox(width: 8),
-                      Chip(
-                        label: Text(_product.condition),
-                        backgroundColor: _getConditionColor(
-                          _product.condition,
-                        ).withOpacity(0.2),
-                      ),
-                    ],
-                  ),
-
-                  // Location
-                  if (_product.location.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        children: [
-                          Icon(Icons.location_on, size: 16, color: Colors.grey),
-                          SizedBox(width: 4),
-                          Text(
-                            _product.location,
-                            style: TextStyle(color: Colors.grey.shade700),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-
-                  // Description
-                  const Text(
-                    'Description',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(_product.description),
-                  const SizedBox(height: 16),
-
-                  // Seller info
-                  const Text(
-                    'Seller',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: Colors.deepPurple.shade100,
-                        child: Text(
-                          _product.sellerName.isNotEmpty
-                              ? _product.sellerName[0].toUpperCase()
-                              : '?',
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_product.sellerName),
-                            Text(
-                              'Listed on ${DateFormat('dd MMM yyyy').format(_product.createdAt)}',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Chat button (if not owner)
-                  if (!isOwner && _product.status == Product.STATUS_AVAILABLE)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.chat),
-                        label: const Text('Chat with Seller'),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ChatScreen(
-                                    product: _product,
-                                    receiverId: _product.sellerId,
-                                    receiverName: _product.sellerName,
-                                  ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                  // Make offer button (if not owner)
-                  if (!isOwner && _product.status == Product.STATUS_AVAILABLE)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.local_offer),
-                          label: const Text('Make Offer'),
-                          onPressed: () {
-                            _showMakeOfferDialog(context);
-                          },
-                        ),
-                      ),
-                    ),
-
-                  // Buy Now button (if not owner)
-                  if (!isOwner && _product.status == Product.STATUS_AVAILABLE)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.shopping_cart),
-                          label: const Text('Buy Now'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) =>
-                                        PaymentScreen(product: _product),
-                              ),
-                            ).then((result) {
-                              if (result == true) {
-                                // Payment was successful
-                                setState(() {
-                                  _product = _product.copyWith(
-                                    status: Product.STATUS_SOLD,
-                                  );
-                                });
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageCarousel() {
-    if (_product.imageUrls.isEmpty) {
-      return Container(
-        height: 250,
-        width: double.infinity,
-        color: Colors.grey.shade200,
-        child: const Icon(
-          Icons.image_not_supported,
-          size: 64,
-          color: Colors.grey,
-        ),
+    setState(() => _isLoading = true);
+    try {
+      await _marketplaceService.updateProductStatus(widget.product.id!, status);
+      // Refresh the product details
+      Product? updatedProduct = await _marketplaceService.getProductById(
+        widget.product.id!,
       );
-    }
 
-    return Stack(
-      children: [
-        CarouselSlider(
-          options: CarouselOptions(
-            height: 250,
-            viewportFraction: 1.0,
-            enlargeCenterPage: false,
-            onPageChanged: (index, reason) {
-              setState(() {
-                _currentImageIndex = index;
-              });
-            },
-          ),
-          items:
-              _product.imageUrls.map((imageUrl) {
-                return Builder(
-                  builder: (BuildContext context) {
-                    return Container(
-                      width: MediaQuery.of(context).size.width,
-                      decoration: BoxDecoration(color: Colors.grey.shade200),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value:
-                                  loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.broken_image,
-                            size: 64,
-                            color: Colors.grey,
-                          );
-                        },
-                      ),
-                    );
-                  },
-                );
-              }).toList(),
-        ),
-        // Image indicator dots
-        if (_product.imageUrls.length > 1)
-          Positioned(
-            bottom: 10,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children:
-                  _product.imageUrls.asMap().entries.map((entry) {
-                    return Container(
-                      width: 8.0,
-                      height: 8.0,
-                      margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            _currentImageIndex == entry.key
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.5),
-                      ),
-                    );
-                  }).toList(),
-            ),
-          ),
-      ],
-    );
+      if (updatedProduct != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Product status updated to $status')),
+        );
+
+        // If we're marking it as sold, we might want to navigate back
+        if (status == Product.STATUS_SOLD) {
+          Navigator.pop(context, updatedProduct);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating product status: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  Future<bool> _showDeleteConfirmation(BuildContext context) async {
-    return await showDialog<bool>(
+  Future<void> _deleteProduct() async {
+    if (widget.product.id == null) return;
+
+    // Show confirmation dialog
+    bool confirm =
+        await showDialog(
           context: context,
           builder:
               (context) => AlertDialog(
-                title: const Text('Delete Listing'),
+                title: const Text('Delete Product'),
                 content: const Text(
-                  'Are you sure you want to delete this listing? This action cannot be undone.',
+                  'Are you sure you want to delete this product? This action cannot be undone.',
                 ),
                 actions: [
                   TextButton(
@@ -541,82 +117,404 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Delete'),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
                 ],
               ),
         ) ??
         false;
+
+    if (!confirm) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _marketplaceService.deleteProduct(widget.product.id!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Product deleted successfully')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting product: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  void _showMakeOfferDialog(BuildContext context) {
-    final TextEditingController offerController = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
+    bool isOwner = _marketplaceService.currentUserId == widget.product.sellerId;
 
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Make an Offer'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.product.title, style: const TextStyle(fontSize: 18)),
+        actions: [
+          if (!isOwner)
+            IconButton(
+              icon: Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorite ? Colors.red : null,
+              ),
+              onPressed: _isLoading ? null : _toggleFavorite,
+            ),
+          if (isOwner)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    _navigateToEditScreen();
+                    break;
+                  case 'mark_reserved':
+                    _updateProductStatus(Product.STATUS_RESERVED);
+                    break;
+                  case 'mark_sold':
+                    _updateProductStatus(Product.STATUS_SOLD);
+                    break;
+                  case 'mark_available':
+                    _updateProductStatus(Product.STATUS_AVAILABLE);
+                    break;
+                  case 'delete':
+                    _deleteProduct();
+                    break;
+                }
+              },
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20),
+                          SizedBox(width: 8),
+                          Text('Edit Product'),
+                        ],
+                      ),
+                    ),
+                    if (widget.product.status != Product.STATUS_RESERVED)
+                      const PopupMenuItem(
+                        value: 'mark_reserved',
+                        child: Row(
+                          children: [
+                            Icon(Icons.access_time, size: 20),
+                            SizedBox(width: 8),
+                            Text('Mark as Reserved'),
+                          ],
+                        ),
+                      ),
+                    if (widget.product.status != Product.STATUS_SOLD)
+                      const PopupMenuItem(
+                        value: 'mark_sold',
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle, size: 20),
+                            SizedBox(width: 8),
+                            Text('Mark as Sold'),
+                          ],
+                        ),
+                      ),
+                    if (widget.product.status != Product.STATUS_AVAILABLE)
+                      const PopupMenuItem(
+                        value: 'mark_available',
+                        child: Row(
+                          children: [
+                            Icon(Icons.shopping_bag, size: 20),
+                            SizedBox(width: 8),
+                            Text('Mark as Available'),
+                          ],
+                        ),
+                      ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text(
+                            'Delete Product',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+            ),
+        ],
+      ),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildProductDetails(),
+    );
+  }
+
+  Widget _buildProductDetails() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Product image
+          if (widget.product.imageUrl.isNotEmpty)
+            Container(
+              width: double.infinity,
+              height: 250,
+              decoration: BoxDecoration(color: Colors.grey[200]),
+              child: Image.network(
+                widget.product.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (context, error, stackTrace) => const Center(
+                      child: Icon(Icons.error, size: 50, color: Colors.grey),
+                    ),
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              height: 250,
+              color: Colors.grey[200],
+              child: const Center(
+                child: Icon(
+                  Icons.image_not_supported,
+                  size: 50,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+
+          // Status badge
+          if (widget.product.status != Product.STATUS_AVAILABLE)
+            Container(
+              width: double.infinity,
+              color:
+                  widget.product.status == Product.STATUS_SOLD
+                      ? Colors.red
+                      : Colors.orange,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                widget.product.status,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+
+          // Product info
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Title and price
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.product.title,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'RM ${widget.product.price.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // Location and posted date
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.product.location,
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Posted ${DateFormat.yMMMd().format(widget.product.createdAt)}',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Category and condition
+                Row(
+                  children: [
+                    Chip(
+                      label: Text(widget.product.category),
+                      backgroundColor: Colors.deepPurple.withOpacity(0.1),
+                      labelStyle: const TextStyle(color: Colors.deepPurple),
+                    ),
+                    const SizedBox(width: 8),
+                    Chip(
+                      label: Text(widget.product.condition),
+                      backgroundColor: Colors.orange.withOpacity(0.1),
+                      labelStyle: const TextStyle(color: Colors.orange),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Description
+                const Text(
+                  'Description',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  'Listed price: RM ${_product.price.toStringAsFixed(2)}',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  widget.product.description,
+                  style: const TextStyle(fontSize: 16),
                 ),
-                SizedBox(height: 16),
-                TextField(
-                  controller: offerController,
-                  decoration: InputDecoration(
-                    labelText: 'Your Offer (RM)',
-                    border: OutlineInputBorder(),
-                    prefixText: 'RM ',
+
+                const SizedBox(height: 24),
+
+                // Seller info
+                const Text(
+                  'Seller Information',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  elevation: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          child: Text(
+                            widget.product.sellerName.isNotEmpty
+                                ? widget.product.sellerName[0].toUpperCase()
+                                : '?',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.product.sellerName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Member since ${DateFormat.yMMMd().format(widget.product.createdAt)}',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  keyboardType: TextInputType.number,
                 ),
+
+                const SizedBox(height: 24),
+
+                // Contact seller button for non-sellers
+                if (_marketplaceService.currentUserId !=
+                        widget.product.sellerId &&
+                    widget.product.status == Product.STATUS_AVAILABLE)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // Show a simple message dialog for the assignment
+                        showDialog(
+                          context: context,
+                          builder:
+                              (context) => AlertDialog(
+                                title: const Text('Contact Seller'),
+                                content: Text(
+                                  'Would you like to message ${widget.product.sellerName}?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      // For assignment purposes, just show a confirmation
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Message sent to ${widget.product.sellerName}',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Send Message'),
+                                  ),
+                                ],
+                              ),
+                        );
+                      },
+                      icon: const Icon(Icons.message),
+                      label: const Text('CONTACT SELLER'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  // Validate offer
-                  double? offer = double.tryParse(offerController.text);
-                  if (offer == null || offer <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid offer amount'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-
-                  Navigator.pop(context);
-
-                  // Open chat with preset message about the offer
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => ChatScreen(
-                            product: _product,
-                            receiverId: _product.sellerId,
-                            receiverName: _product.sellerName,
-                            initialMessage:
-                                'Hi, I\'m interested in "${_product.title}". Would you accept RM${offer.toStringAsFixed(2)} for it?',
-                          ),
-                    ),
-                  );
-                },
-                child: const Text('Send Offer'),
-              ),
-            ],
           ),
+        ],
+      ),
     );
+  }
+
+  void _navigateToEditScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProductScreen(product: widget.product),
+      ),
+    );
+
+    if (result != null && result is Product) {
+      // The product was updated
+      setState(() {}); // Refresh the UI
+    }
   }
 }
