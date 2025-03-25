@@ -20,6 +20,8 @@ class CommunityService {
       _firestore.collection('community_posts');
   CollectionReference _commentsCollection(String postId) =>
       _firestore.collection('community_posts/$postId/comments');
+  CollectionReference get _reportsCollection =>
+      _firestore.collection('reports');
 
   // Get all posts with optional filtering
   Stream<List<CommunityPost>> getPosts({PostType? filterType}) {
@@ -91,6 +93,7 @@ class CommunityService {
         imageUrls: imageUrls,
         createdAt: DateTime.now(),
         metadata: metadata,
+        reportCount: 0,
       );
 
       // Save post to Firestore
@@ -361,5 +364,48 @@ class CommunityService {
 
       return title.contains(searchQuery) || content.contains(searchQuery);
     }).toList();
+  }
+
+  // Report a post
+  Future<void> reportPost({
+    required String postId,
+    required String reason,
+    String? additionalInfo,
+  }) async {
+    try {
+      final User? user = _auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Check if this user already reported this post
+      final existingReports =
+          await _reportsCollection
+              .where('postId', isEqualTo: postId)
+              .where('userId', isEqualTo: user.uid)
+              .get();
+
+      if (existingReports.docs.isNotEmpty) {
+        throw Exception('You have already reported this post');
+      }
+
+      // Create report document
+      final report = {
+        'postId': postId,
+        'userId': user.uid,
+        'reason': reason,
+        'additionalInfo': additionalInfo ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending', // For admin review
+      };
+
+      // Add report to Firestore
+      await _reportsCollection.add(report);
+
+      // Increment report count on the post
+      await _postsCollection.doc(postId).update({
+        'reportCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      throw Exception('Failed to submit report: $e');
+    }
   }
 }

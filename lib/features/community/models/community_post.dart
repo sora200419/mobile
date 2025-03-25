@@ -15,6 +15,7 @@ class CommunityPost {
   final DateTime createdAt;
   final int likes;
   final int commentCount;
+  final int reportCount;
   final Map<String, dynamic>? metadata;
 
   CommunityPost({
@@ -28,6 +29,7 @@ class CommunityPost {
     required this.createdAt,
     this.likes = 0,
     this.commentCount = 0,
+    this.reportCount = 0,
     this.metadata,
   });
 
@@ -45,6 +47,7 @@ class CommunityPost {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       likes: data['likes'] ?? 0,
       commentCount: data['commentCount'] ?? 0,
+      reportCount: data['reportCount'] ?? 0,
       metadata: data['metadata'],
     );
   }
@@ -61,6 +64,7 @@ class CommunityPost {
       'createdAt': Timestamp.fromDate(createdAt),
       'likes': likes,
       'commentCount': commentCount,
+      'reportCount': reportCount,
       'metadata': metadata ?? {},
     };
   }
@@ -77,6 +81,7 @@ class CommunityPost {
     DateTime? createdAt,
     int? likes,
     int? commentCount,
+    int? reportCount,
     Map<String, dynamic>? metadata,
   }) {
     return CommunityPost(
@@ -90,6 +95,7 @@ class CommunityPost {
       createdAt: createdAt ?? this.createdAt,
       likes: likes ?? this.likes,
       commentCount: commentCount ?? this.commentCount,
+      reportCount: reportCount ?? this.reportCount,
       metadata: metadata ?? this.metadata,
     );
   }

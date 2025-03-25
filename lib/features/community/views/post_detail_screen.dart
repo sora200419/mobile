@@ -80,6 +80,169 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     Share.share(postContent);
   }
 
+  Future<void> _reportPost() async {
+    final reportReasons = [
+      'Inappropriate content',
+      'Spam or misleading',
+      'Hate speech',
+      'Harassment or bullying',
+      'Violence or threatening content',
+      'False information',
+      'Other',
+    ];
+
+    String? selectedReason;
+    String additionalInfo = '';
+    bool isSubmitting = false;
+
+    final reported = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(Icons.report_problem, color: Colors.deepPurple),
+                    const SizedBox(width: 8),
+                    const Text('Report Post'),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Why are you reporting this post?',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      for (final reason in reportReasons)
+                        RadioListTile<String>(
+                          title: Text(reason),
+                          value: reason,
+                          groupValue: selectedReason,
+                          activeColor: Colors.deepPurple,
+                          onChanged:
+                              isSubmitting
+                                  ? null
+                                  : (value) {
+                                    setState(() {
+                                      selectedReason = value;
+                                    });
+                                  },
+                        ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: 'Additional information (optional)',
+                          border: OutlineInputBorder(),
+                          hintText:
+                              'Please provide any details that might help us understand the issue',
+                          enabled: !isSubmitting,
+                        ),
+                        maxLines: 3,
+                        onChanged: (value) {
+                          additionalInfo = value;
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Note: Our moderation team will review this report within 24 hours',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed:
+                        isSubmitting
+                            ? null
+                            : () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed:
+                        (selectedReason == null || isSubmitting)
+                            ? null
+                            : () async {
+                              setState(() {
+                                isSubmitting = true;
+                              });
+
+                              try {
+                                await _communityService.reportPost(
+                                  postId: widget.post.id!,
+                                  reason: selectedReason!,
+                                  additionalInfo: additionalInfo,
+                                );
+
+                                if (context.mounted) {
+                                  Navigator.pop(context, true);
+                                }
+                              } catch (e) {
+                                setState(() {
+                                  isSubmitting = false;
+                                });
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e')),
+                                  );
+                                }
+                              }
+                            },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                    ),
+                    child:
+                        isSubmitting
+                            ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Submitting...'),
+                              ],
+                            )
+                            : const Text('Submit Report'),
+                  ),
+                ],
+              );
+            },
+          ),
+    );
+
+    if (reported == true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Report submitted. Thank you for keeping our community safe.',
+            ),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.deepPurple,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,53 +307,71 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             );
           }
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                PostCard(post: post, isDetailed: true),
-                if (post.type != PostType.general && post.metadata != null)
-                  _buildMetadataSection(post),
-                CommentSection(postId: post.id!),
-                const SizedBox(height: 32),
-              ],
-            ),
+          // Use CustomScrollView for better control of the scrolling behavior
+          return CustomScrollView(
+            slivers: [
+              SliverSafeArea(
+                bottom: false, // Don't add padding at bottom
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      PostCard(post: post, isDetailed: true),
+                      if (post.type != PostType.general &&
+                          post.metadata != null)
+                        _buildMetadataSection(post),
+                      CommentSection(postId: post.id!),
+                      // Add extra padding to avoid bottom bar overlap
+                      SizedBox(
+                        height: MediaQuery.of(context).padding.bottom + 80,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
-      bottomNavigationBar: BottomAppBar(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildActionButton(
-                icon: Icons.share,
-                label: 'Share',
-                onPressed: _sharePost,
-              ),
-              _buildActionButton(
-                icon: Icons.bookmark_border,
-                label: 'Save',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Bookmark feature coming soon!'),
-                    ),
-                  );
-                },
-              ),
-              _buildActionButton(
-                icon: Icons.report_outlined,
-                label: 'Report',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Report feature coming soon!'),
-                    ),
-                  );
-                },
-              ),
-            ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, -1),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionButton(
+                  icon: Icons.share,
+                  label: 'Share',
+                  onPressed: _sharePost,
+                ),
+                _buildActionButton(
+                  icon: Icons.bookmark_border,
+                  label: 'Save',
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bookmark feature coming soon!'),
+                      ),
+                    );
+                  },
+                ),
+                _buildActionButton(
+                  icon: Icons.report_outlined,
+                  label: 'Report',
+                  onPressed: _reportPost,
+                ),
+              ],
+            ),
           ),
         ),
       ),
