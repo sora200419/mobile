@@ -100,16 +100,6 @@ class _ProfileTabState extends State<ProfileTab> {
     return (await _gamificationService.getUserAchievements(userId)).length;
   }
 
-  void _signOut() async {
-    try {
-      await _auth.signOut();
-      // 可以添加导航到登录页或其他操作
-      print('User signed out');
-    } catch (e) {
-      print('Error signing out: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -258,7 +248,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       horizontal: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -268,7 +258,6 @@ class _ProfileTabState extends State<ProfileTab> {
                         const Text(
                           'Logout',
                           style: TextStyle(color: Colors.red),
-                          // Todo: logout
                         ),
                       ],
                     ),
@@ -277,7 +266,6 @@ class _ProfileTabState extends State<ProfileTab> {
               ],
             ),
           ),
-
           // Bottom padding
           const SizedBox(height: 40),
         ],
@@ -376,7 +364,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 style: const TextStyle(fontSize: 12),
               ),
               Text(
-                '${progress.pointsToNextLevel}',
+                '${progress.points}',
                 style: const TextStyle(fontSize: 14),
               ),
             ],
@@ -390,11 +378,6 @@ class _ProfileTabState extends State<ProfileTab> {
               backgroundColor: Colors.grey.shade200,
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${progress.points} points',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
@@ -454,10 +437,10 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  // Recent Achievements section (simplified for this example)
+  // Recent Achievements section
   Widget _buildRecentAchievements(String userId) {
-    return SizedBox( // 使用 SizedBox 来控制宽度
-      width: double.infinity, // 让宽度尽可能大
+    return SizedBox(
+      width: double.infinity,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -520,7 +503,7 @@ class _ProfileTabState extends State<ProfileTab> {
           'Account',
           Container(),
           Icons.person,
-        ), // 占位符，后面会替换
+        ),
       ],
     );
   }
@@ -535,7 +518,6 @@ class _ProfileTabState extends State<ProfileTab> {
     return InkWell(
       onTap: () {
         if (screen is! Container) {
-          // 避免点击占位符
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => screen),

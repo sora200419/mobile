@@ -4,12 +4,13 @@ import 'package:mobiletesting/View/status_tag.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 
 class TaskDetailsPage extends StatelessWidget {
   final Task task;
 
-  String _getButtonLabel(String status){
-    switch (status){
+  String _getButtonLabel(String status) {
+    switch (status) {
       case 'open':
         return 'Accept';
       case 'assigned':
@@ -21,8 +22,8 @@ class TaskDetailsPage extends StatelessWidget {
     }
   }
 
-  Color _getButtonColor(String status){
-    switch(status){
+  Color _getButtonColor(String status) {
+    switch (status) {
       case 'open':
         return Colors.green[50]!;
       case 'assigned':
@@ -101,18 +102,44 @@ class TaskDetailsPage extends StatelessWidget {
             SizedBox(height: 25),
             Divider(),
             SizedBox(height: 25),
-            if(task.status != 'completed')
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  _updateTask(context, task.id!, task.status);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _getButtonColor(task.status),
-                ),
-                icon: Icon(Icons.check_circle),
-                label: Text(_getButtonLabel(task.status)),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                if (task.status != 'completed')
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          _updateTask(context, task.id!, task.status);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _getButtonColor(task.status),
+                        ),
+                        icon: Icon(Icons.check_circle),
+                        label: Text(_getButtonLabel(task.status)),
+                      ),
+                    ),
+                  ),
+                if (task.providerId != null)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TaskChatScreen(task: task),
+                            ),
+                          );
+                        },
+                        icon: Icon(Icons.chat),
+                        label: Text("Chat"),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
@@ -147,23 +174,30 @@ class TaskDetailsPage extends StatelessWidget {
     );
   }
 
-  void _updateTask(BuildContext context, String taskId, String currentStatus) async {
+  void _updateTask(
+    BuildContext context,
+    String taskId,
+    String currentStatus,
+  ) async {
     String newStatus;
     switch (currentStatus) {
       case 'open':
         newStatus = 'assigned';
-        // 获取当前 runner 的 uid 和 name
+        // get current runner uid and name
         final FirebaseAuth auth = FirebaseAuth.instance;
         final User? user = auth.currentUser;
         if (user != null) {
           final String providerId = user.uid;
           final String providerName = await _getCurrentRunnerName();
           try {
-            await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
-              'status': newStatus,
-              'providerId': providerId,
-              'providerName': providerName,
-            });
+            await FirebaseFirestore.instance
+                .collection('tasks')
+                .doc(taskId)
+                .update({
+                  'status': newStatus,
+                  'providerId': providerId,
+                  'providerName': providerName,
+                });
             Navigator.pop(context);
           } catch (error) {
             print("Error updating task status: $error");
@@ -177,13 +211,53 @@ class TaskDetailsPage extends StatelessWidget {
         break;
       case 'in_transit':
         newStatus = 'completed';
-        break;
+        final FirebaseAuth auth = FirebaseAuth.instance;
+        final User? user = auth.currentUser;
+        if (user != null) {
+          final String userId = user.uid;
+          final int rewardPoints = task.rewardPoints;
+          try {
+            DocumentSnapshot userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(userId)
+                    .get();
+
+            if (userDoc.exists) {
+              int currentPoints =
+                  (userDoc.data() as Map<String, dynamic>)['points'] ?? 0;
+              int newPoints = currentPoints + rewardPoints;
+
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId)
+                  .update({'points': newPoints});
+              print('User points updated: $newPoints');
+            } else {
+              print('User document not found.');
+            }
+
+            // update task status
+            await FirebaseFirestore.instance
+                .collection('tasks')
+                .doc(taskId)
+                .update({'status': newStatus});
+            Navigator.pop(context);
+          } catch (error) {
+            print("Error updating task status or user points: $error");
+          }
+        } else {
+          print("Error: User not logged in.");
+        }
+        return;
       default:
         return;
     }
 
     try {
-      await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({'status': newStatus});
+      await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
+        'status': newStatus,
+      });
       Navigator.pop(context);
     } catch (error) {
       print("Error updating task status: $error");
@@ -195,10 +269,11 @@ class TaskDetailsPage extends StatelessWidget {
       final FirebaseAuth auth = FirebaseAuth.instance;
       final User? user = auth.currentUser;
       if (user != null) {
-        final DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final DocumentSnapshot userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
         if (userDoc.exists) {
           return (userDoc.data() as Map<String, dynamic>)['name'] ?? 'Runner';
         }

@@ -17,17 +17,29 @@ class HomeRunner extends StatefulWidget {
 }
 
 class _HomeRunnerState extends State<HomeRunner> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthProvider _authProvider = AuthProvider();
+
   int _selectedIndex = 0;
   String _searchQuery = '';
   int _userPoints = 0;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoadingPoints = true;
+  String? _username;
 
   @override
   void initState() {
     super.initState();
     _fetchUserPoints();
+    _fetchUsername();
   }
+
+  Future<void> _fetchUsername() async {
+    await _authProvider.checkUser();
+    setState(() {
+      _username = _authProvider.username;
+    });
+  }
+
 
   Future<void> _fetchUserPoints() async {
     setState(() {
@@ -72,16 +84,15 @@ class _HomeRunnerState extends State<HomeRunner> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => Scaffold( // Wrap ProfileTab in Scaffold
+          builder: (context) => Scaffold(
             appBar: AppBar(
-              title: Text("Profile"), // You can customize the AppBar for ProfileTab
+              title: Text("Hi $_username"),
             ),
-            body: ProfileTab(), // Your ProfileTab content
+            body: ProfileTab(),
           ),
         ),
       );
     }
-    // todo: add support.dart and setting.dart
   }
 
   @override
