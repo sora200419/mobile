@@ -4,7 +4,6 @@ import 'admin/data_analysis.dart';
 import 'admin/settings.dart';
 import 'admin/user_management.dart';
 import 'admin/post_details.dart';
-import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class HomeAdmin extends StatefulWidget {
@@ -99,10 +98,13 @@ class _PostsTabState extends State<PostsTab> {
   );
   final ScrollController _scrollController = ScrollController();
   List<DocumentSnapshot> _postList = [];
-  int _limit = 20; // initial loading amount
+  int _limit = 20;
   bool _isLoading = false;
   bool _hasMore = true;
   DocumentSnapshot? _lastDocument;
+  String _searchQuery = '';
+  String _sortField = 'createdAt';
+  bool _sortAscending = false;
 
   @override
   void initState() {
@@ -124,20 +126,31 @@ class _PostsTabState extends State<PostsTab> {
     });
 
     try {
-      Query query = posts.orderBy('createdAt', descending: true).limit(_limit);
+      Query query = posts
+          .orderBy(_sortField, descending: !_sortAscending)
+          .limit(_limit);
       if (_lastDocument != null) {
         query = query.startAfterDocument(_lastDocument!);
       }
 
       QuerySnapshot snapshot = await query.get();
 
-      if (snapshot.docs.length < _limit) {
+      List<DocumentSnapshot> filteredDocs =
+          snapshot.docs.where((doc) {
+            var data = doc.data() as Map<String, dynamic>;
+            String title = (data['title'] ?? '').toString().toLowerCase();
+            String content = (data['content'] ?? '').toString().toLowerCase();
+            String query = _searchQuery.toLowerCase();
+            return title.contains(query) || content.contains(query);
+          }).toList();
+
+      if (filteredDocs.length < _limit) {
         _hasMore = false;
       }
 
       setState(() {
-        _postList.addAll(snapshot.docs);
-        _lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+        _postList.addAll(filteredDocs);
+        _lastDocument = filteredDocs.isNotEmpty ? filteredDocs.last : null;
         _isLoading = false;
       });
     } catch (e) {
@@ -169,10 +182,7 @@ class _PostsTabState extends State<PostsTab> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-            child: Text(
-              "Delete",
-              style: TextStyle(color: Colors.red),
-            ),
+              child: Text("Delete", style: TextStyle(color: Colors.red)),
               onPressed: () async {
                 try {
                   await posts.doc(docId).delete();
@@ -192,99 +202,239 @@ class _PostsTabState extends State<PostsTab> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.grey[100],
-      child: ListView.builder(
-        controller: _scrollController,
-        itemCount: _postList.length + (_isLoading ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index < _postList.length) {
-            var data = _postList[index].data() as Map<String, dynamic>;
-            String createdAt = timeago.format(data['createdAt'].toDate());
-            List<dynamic>? imageUrls = data['imageUrls'] as List<dynamic>?;
-
-            return Card(
-              elevation: 4,
-              margin: EdgeInsets.all(8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ListTile(
-                contentPadding: EdgeInsets.all(16),
-                leading: CircleAvatar(
-                  child: Text(data['userName']?[0] ?? 'U'),
-                ),
-                title: Text(
-                  data['title'] ?? 'No Title',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['content'] ?? 'No Content',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '${data['userName'] ?? 'Unknown'} - $createdAt',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    if (imageUrls != null && imageUrls.isNotEmpty)
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => PostDetailsPage(
-                                    postId: _postList[index].id,
-                                  ),
-                            ),
-                          );
-                        },
-                        child: Text('View Image'),
-                      ),
-                  ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.comment),
-                      onPressed: () {
-                        // TODO: 跳转评论列表
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed:
-                          () => _confirmDelete(context, _postList[index].id),
-                    ),
-                  ],
-                ),
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Sort Posts"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text("Sort by Time (Newest First)"),
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              PostDetailsPage(postId: _postList[index].id),
-                    ),
-                  );
+                  setState(() {
+                    _sortField = 'createdAt';
+                    _sortAscending = false;
+                    _postList.clear();
+                    _lastDocument = null;
+                    _hasMore = true;
+                    _fetchPosts();
+                  });
+                  Navigator.of(context).pop();
                 },
               ),
-            );
-          } else if (_isLoading) {
-            return Center(child: CircularProgressIndicator());
-          } else {
-            return Container();
-          }
-        },
-      ),
+              ListTile(
+                title: Text("Sort by Time (Oldest First)"),
+                onTap: () {
+                  setState(() {
+                    _sortField = 'createdAt';
+                    _sortAscending = true;
+                    _postList.clear();
+                    _lastDocument = null;
+                    _hasMore = true;
+                    _fetchPosts();
+                  });
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                title: Text("Sort by Report Count (High to Low)"),
+                onTap: () {
+                  setState(() {
+                    _sortField = 'metadata.reportCount';
+                    _sortAscending = false;
+                    _postList.clear();
+                    _lastDocument = null;
+                    _hasMore = true;
+                    _fetchPosts();
+                  });
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                title: Text("Sort by Report Count (Low to High)"),
+                onTap: () {
+                  setState(() {
+                    _sortField = 'metadata.reportCount';
+                    _sortAscending = true;
+                    _postList.clear();
+                    _lastDocument = null;
+                    _hasMore = true;
+                    _fetchPosts();
+                  });
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text("Cancel"),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search Posts',
+                hintStyle: TextStyle(color: Colors.grey),
+                prefixIcon: Icon(Icons.search, color: Colors.grey),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.filter_list, color: Colors.grey),
+                  onPressed: _showFilterDialog,
+                ),
+                border: InputBorder.none,
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 0,
+                  horizontal: 16,
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                  _postList.clear();
+                  _lastDocument = null;
+                  _hasMore = true;
+                  _fetchPosts();
+                });
+              },
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            color: Colors.grey[100],
+            child:
+                _postList.isEmpty && !_isLoading
+                    ? Center(
+                      child: Text(
+                        "No posts found",
+                        style: TextStyle(fontSize: 18, color: Colors.black54),
+                      ),
+                    )
+                    : ListView.builder(
+                      controller: _scrollController,
+                      itemCount: _postList.length + (_isLoading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index < _postList.length) {
+                          var data =
+                              _postList[index].data() as Map<String, dynamic>;
+                          String createdAt = timeago.format(
+                            data['createdAt'].toDate(),
+                          );
+                          List<dynamic>? imageUrls =
+                              data['imageUrls'] as List<dynamic>?;
+                          String? firstImageUrl =
+                              (imageUrls != null && imageUrls.isNotEmpty)
+                                  ? imageUrls[0] as String
+                                  : null;
+
+                          return Card(
+                            elevation: 4,
+                            margin: EdgeInsets.all(8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: ListTile(
+                              contentPadding: EdgeInsets.all(16),
+                              leading:
+                                  firstImageUrl != null
+                                      ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          firstImageUrl,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  CircleAvatar(
+                                                    child: Text(
+                                                      data['userName']?[0] ??
+                                                          'U',
+                                                    ),
+                                                  ),
+                                        ),
+                                      )
+                                      : CircleAvatar(
+                                        child: Text(
+                                          data['userName']?[0] ?? 'U',
+                                        ),
+                                      ),
+                              title: Text(
+                                data['title'] ?? 'No Title',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    data['content'] ?? 'No Content',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    '${data['userName'] ?? 'Unknown'} - $createdAt',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    onPressed:
+                                        () => _confirmDelete(
+                                          context,
+                                          _postList[index].id,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => PostDetailsPage(
+                                          postId: _postList[index].id,
+                                        ),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        } else if (_isLoading) {
+                          return Center(child: CircularProgressIndicator());
+                        } else {
+                          return Container();
+                        }
+                      },
+                    ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -330,7 +480,7 @@ class ProductsTab extends StatelessWidget {
             return Center(
               child: Text(
                 "Error: ${snapshot.error}",
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.black54),
               ),
             );
           }
@@ -338,6 +488,14 @@ class ProductsTab extends StatelessWidget {
             return Center(child: CircularProgressIndicator());
           }
           var docs = snapshot.data!.docs;
+          if (docs.isEmpty) {
+            return Center(
+              child: Text(
+                "No products found",
+                style: TextStyle(fontSize: 18, color: Colors.black54),
+              ),
+            );
+          }
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
