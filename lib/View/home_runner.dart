@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/profile.dart';
+import 'package:mobiletesting/View/runner_profile.dart';
 import 'package:mobiletesting/View/status_tag.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
@@ -35,17 +36,21 @@ class _HomeRunnerState extends State<HomeRunner> {
     User? user = _auth.currentUser;
     if (user != null) {
       try {
-        DocumentSnapshot userSnapshot =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
         if (userSnapshot.exists && userSnapshot.data() != null) {
           setState(() {
             _userPoints =
                 (userSnapshot.data() as Map<String, dynamic>)['points'] ?? 0;
             _isLoadingPoints = false;
+          });
+        } else {
+          setState(() {
+            _isLoadingPoints = false;
+            print('User document does not exist in Firestore.');
           });
         }
       } catch (e) {
@@ -54,6 +59,11 @@ class _HomeRunnerState extends State<HomeRunner> {
           print('Error fetching user points: $e');
         });
       }
+    } else {
+      setState(() {
+        _isLoadingPoints = false;
+        print('No user logged in.');
+      });
     }
   }
 
@@ -61,7 +71,14 @@ class _HomeRunnerState extends State<HomeRunner> {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ProfileScreen()),
+        MaterialPageRoute(
+          builder: (context) => Scaffold( // Wrap ProfileTab in Scaffold
+            appBar: AppBar(
+              title: Text("Profile"), // You can customize the AppBar for ProfileTab
+            ),
+            body: ProfileTab(), // Your ProfileTab content
+          ),
+        ),
       );
     }
     // todo: add support.dart and setting.dart
@@ -74,17 +91,6 @@ class _HomeRunnerState extends State<HomeRunner> {
       child: Scaffold(
         appBar: AppBar(
           title: Text("CampusLink"),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.logout),
-              onPressed: () {
-                Provider.of<AuthProvider>(
-                  context,
-                  listen: false,
-                ).logout(context);
-              },
-            ),
-          ],
           bottom: TabBar(
             tabs: [
               Tab(icon: Icon(Icons.hourglass_empty), text: "Pending"),
@@ -93,7 +99,7 @@ class _HomeRunnerState extends State<HomeRunner> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -135,7 +141,9 @@ class _HomeRunnerState extends State<HomeRunner> {
                       ],
                     ),
                     SizedBox(width: 8),
-                    Text(
+                    _isLoadingPoints
+                        ? CircularProgressIndicator()
+                        : Text(
                       'My Points: $_userPoints',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -200,13 +208,12 @@ class TaskListWidget extends StatelessWidget {
 
         List<Task> tasks = snapshot.data!;
 
-        List<Task> filteredTasks =
-            tasks.where((task) {
-              final lowerCaseQuery = searchQuery.toLowerCase();
-              return task.title.toLowerCase().contains(lowerCaseQuery) ||
-                  task.description.toLowerCase().contains(lowerCaseQuery) ||
-                  (task.category.toLowerCase().contains(lowerCaseQuery));
-            }).toList();
+        List<Task> filteredTasks = tasks.where((task) {
+          final lowerCaseQuery = searchQuery.toLowerCase();
+          return task.title.toLowerCase().contains(lowerCaseQuery) ||
+              task.description.toLowerCase().contains(lowerCaseQuery) ||
+              (task.category.toLowerCase().contains(lowerCaseQuery));
+        }).toList();
 
         if (filteredTasks.isEmpty) {
           return Center(child: Text("No tasks found"));
