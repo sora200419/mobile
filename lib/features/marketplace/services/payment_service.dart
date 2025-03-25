@@ -1,199 +1,333 @@
 // lib/features/marketplace/services/payment_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mobiletesting/features/marketplace/models/payment_model.dart';
-import 'package:mobiletesting/features/marketplace/models/product_model.dart';
-import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
+import '../models/product_model.dart';
+import '../models/transaction_model.dart' as models;
+import 'marketplace_service.dart';
+import 'cloudinary_service.dart';
+import 'chat_service.dart';
 
 class PaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   final MarketplaceService _marketplaceService = MarketplaceService();
+  final ChatService _chatService = ChatService();
 
-  // Paynet API credentials and endpoints
-  final String _apiKey = 'your_paynet_api_key';
-  final String _secretKey = 'your_paynet_secret_key';
-  final String _baseUrl =
-      'https://api.paynet.my'; // Replace with the actual Paynet API URL
+  // Get current user ID
+  String? get currentUserId => _auth.currentUser?.uid;
 
-  // Create a new payment
-  Future<Payment> createPayment({
-    required String productId,
-    required String sellerId,
-    required double amount,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('User not logged in');
+  // Collection references
+  CollectionReference get _transactionsRef =>
+      _firestore.collection('transactions');
+  CollectionReference get _notificationsRef =>
+      _firestore.collection('notifications');
+  CollectionReference get _usersRef => _firestore.collection('users');
 
-    final payment = Payment(
-      productId: productId,
-      buyerId: user.uid,
-      sellerId: sellerId,
-      amount: amount,
-      paymentMethod: 'Paynet',
-      status: 'pending',
+  // Create a new transaction
+  Future<String> createTransaction(
+    Product product,
+    String paymentMethod,
+  ) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Get current user info
+    DocumentSnapshot userDoc = await _usersRef.doc(currentUserId).get();
+    String buyerName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
+
+    // Create transaction
+    models.Transaction transaction = models.Transaction(
+      productId: product.id!,
+      productTitle: product.title,
+      buyerId: currentUserId!,
+      buyerName: buyerName,
+      sellerId: product.sellerId,
+      sellerName: product.sellerName,
+      amount: product.price,
+      paymentMethod: paymentMethod,
       createdAt: DateTime.now(),
     );
 
-    DocumentReference docRef = await _firestore
-        .collection('payments')
-        .add(payment.toMap());
-    return payment.copyWith(id: docRef.id);
+    // Add to Firestore
+    DocumentReference docRef = await _transactionsRef.add(
+      transaction.toFirestore(),
+    );
+
+    // Assign the ID to the transaction
+    transaction = transaction.copyWith(id: docRef.id);
+
+    // Create a chat for this transaction
+    await _createChatForTransaction(transaction);
+
+    // Update product status to reserved - use the new method instead of updateProductStatus
+    await _marketplaceService.updateProductStatusForTransaction(
+      product.id!,
+      Product.STATUS_RESERVED,
+    );
+
+    // Notify seller
+    await _notificationsRef.add({
+      'userId': product.sellerId,
+      'title': 'New Order',
+      'message': 'You have a new order for ${product.title}',
+      'read': false,
+      'createdAt': Timestamp.now(),
+    });
+
+    return docRef.id;
   }
 
-  // Initialize a Paynet payment
-  Future<Map<String, dynamic>> initializePaynetPayment(Payment payment) async {
+  // Create a chat for a transaction
+  Future<void> _createChatForTransaction(models.Transaction transaction) async {
     try {
-      // Get product details
-      DocumentSnapshot productDoc =
-          await _firestore.collection('products').doc(payment.productId).get();
-      Product product = Product.fromFirestore(productDoc);
-
-      // Get buyer details
-      DocumentSnapshot buyerDoc =
-          await _firestore.collection('users').doc(payment.buyerId).get();
-      Map<String, dynamic> buyerData = buyerDoc.data() as Map<String, dynamic>;
-
-      // Prepare the request payload for Paynet
-      final payload = {
-        'amount': payment.amount,
-        'currency': 'MYR',
-        'description': 'Payment for ${product.title}',
-        'reference_id': payment.id,
-        'callback_url':
-            'https://yourdomain.com/api/payment/callback', // Replace with your actual callback URL
-        'redirect_url':
-            'campuslink://payment/completed', // Deep link for your app
-        'customer_details': {
-          'name': buyerData['name'] ?? '',
-          'email': buyerData['email'] ?? '',
-          'phone': buyerData['phone'] ?? '',
-        },
-      };
-
-      // Make the API request to Paynet
-      final response = await http.post(
-        Uri.parse('${_baseUrl}/v1/payment'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
-        },
-        body: jsonEncode(payload),
-      );
-
-      if (response.statusCode == 200) {
-        Map<String, dynamic> responseData = jsonDecode(response.body);
-
-        // Update payment with transaction ID
-        await _firestore.collection('payments').doc(payment.id).update({
-          'transactionId': responseData['transaction_id'],
-          'paymentDetails': responseData,
-        });
-
-        return responseData;
-      } else {
-        throw Exception('Payment initialization failed: ${response.body}');
+      if (transaction.id != null) {
+        // Create a chat for this transaction
+        await _chatService.createChat(transaction);
       }
     } catch (e) {
-      print('Error initializing Paynet payment: $e');
-      throw e;
+      print('Error creating chat for transaction: $e');
     }
   }
 
-  // Process Paynet payment status update
-  Future<void> updatePaymentStatus(
-    String paymentId,
-    String status,
-    Map<String, dynamic> details,
+  // Update transaction with payment details
+  Future<void> updateTransactionPayment(
+    String transactionId,
+    String paymentReference,
+    File receiptImage,
   ) async {
-    try {
-      await _firestore.collection('payments').doc(paymentId).update({
-        'status': status,
-        'paymentDetails': FieldValue.arrayUnion([details]),
-      });
-
-      // If payment is completed, update product status
-      if (status == 'completed') {
-        DocumentSnapshot paymentDoc =
-            await _firestore.collection('payments').doc(paymentId).get();
-        Payment payment = Payment.fromFirestore(paymentDoc);
-
-        // Mark product as sold and record the buyer
-        await _firestore.collection('products').doc(payment.productId).update({
-          'status': Product.STATUS_SOLD,
-          'buyerId': payment.buyerId,
-          'soldAt': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      print('Error updating payment status: $e');
-      throw e;
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
     }
+
+    // Check if transaction exists and belongs to the current user
+    DocumentSnapshot doc = await _transactionsRef.doc(transactionId).get();
+
+    if (!doc.exists) {
+      throw Exception('Transaction not found');
+    }
+
+    models.Transaction transaction = models.Transaction.fromFirestore(doc);
+
+    if (transaction.buyerId != currentUserId) {
+      throw Exception('You are not authorized to update this transaction');
+    }
+
+    // Upload receipt image
+    String folder = 'marketplace/payments/$transactionId';
+    String receiptUrl = await _cloudinaryService.uploadImage(
+      receiptImage,
+      folder: folder,
+    );
+
+    // Update transaction
+    await _transactionsRef.doc(transactionId).update({
+      'paymentReference': paymentReference,
+      'receiptUrl': receiptUrl,
+      'updatedAt': Timestamp.now(),
+    });
+
+    // Notify seller about payment proof
+    await _notificationsRef.add({
+      'userId': transaction.sellerId,
+      'title': 'Payment Submitted',
+      'message':
+          'Payment proof has been submitted for ${transaction.productTitle}',
+      'read': false,
+      'createdAt': Timestamp.now(),
+    });
   }
 
-  // Get a specific payment
-  Future<Payment?> getPayment(String paymentId) async {
-    try {
-      DocumentSnapshot doc =
-          await _firestore.collection('payments').doc(paymentId).get();
-      if (doc.exists) {
-        return Payment.fromFirestore(doc);
-      }
-      return null;
-    } catch (e) {
-      print('Error getting payment: $e');
-      throw e;
+  // Complete transaction (seller confirms payment)
+  Future<void> completeTransaction(String transactionId) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
     }
+
+    // Check if transaction exists and the current user is the seller
+    DocumentSnapshot doc = await _transactionsRef.doc(transactionId).get();
+
+    if (!doc.exists) {
+      throw Exception('Transaction not found');
+    }
+
+    models.Transaction transaction = models.Transaction.fromFirestore(doc);
+
+    if (transaction.sellerId != currentUserId) {
+      throw Exception('Only the seller can confirm this transaction');
+    }
+
+    // Update transaction status
+    await _transactionsRef.doc(transactionId).update({
+      'status': models.Transaction.STATUS_COMPLETED,
+      'updatedAt': Timestamp.now(),
+    });
+
+    // Update product status to sold - use the new method instead of updateProductStatus
+    await _marketplaceService.updateProductStatusForTransaction(
+      transaction.productId,
+      Product.STATUS_SOLD,
+    );
+
+    // Notify buyer
+    await _notificationsRef.add({
+      'userId': transaction.buyerId,
+      'title': 'Payment Confirmed',
+      'message':
+          'Your payment for ${transaction.productTitle} has been confirmed',
+      'read': false,
+      'createdAt': Timestamp.now(),
+    });
   }
 
-  // Get payments for a user (either as buyer or seller)
-  Stream<List<Payment>> getUserPayments({bool asBuyer = true}) {
-    final user = _auth.currentUser;
-    if (user == null) {
+  // Reject transaction (seller rejects payment)
+  Future<void> rejectTransaction(
+    String transactionId,
+    String rejectionReason,
+  ) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Check if transaction exists and the current user is the seller
+    DocumentSnapshot doc = await _transactionsRef.doc(transactionId).get();
+
+    if (!doc.exists) {
+      throw Exception('Transaction not found');
+    }
+
+    models.Transaction transaction = models.Transaction.fromFirestore(doc);
+
+    if (transaction.sellerId != currentUserId) {
+      throw Exception('Only the seller can reject this transaction');
+    }
+
+    // Update transaction status
+    await _transactionsRef.doc(transactionId).update({
+      'status': models.Transaction.STATUS_REJECTED,
+      'rejectionReason': rejectionReason,
+      'updatedAt': Timestamp.now(),
+    });
+
+    // Update product status back to available - use the new method instead of updateProductStatus
+    await _marketplaceService.updateProductStatusForTransaction(
+      transaction.productId,
+      Product.STATUS_AVAILABLE,
+    );
+
+    // Notify buyer
+    await _notificationsRef.add({
+      'userId': transaction.buyerId,
+      'title': 'Payment Rejected',
+      'message':
+          'Your payment for ${transaction.productTitle} was rejected: $rejectionReason',
+      'read': false,
+      'createdAt': Timestamp.now(),
+    });
+  }
+
+  // Cancel transaction (buyer cancels)
+  Future<void> cancelTransaction(String transactionId) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Check if transaction exists and the current user is the buyer
+    DocumentSnapshot doc = await _transactionsRef.doc(transactionId).get();
+
+    if (!doc.exists) {
+      throw Exception('Transaction not found');
+    }
+
+    models.Transaction transaction = models.Transaction.fromFirestore(doc);
+
+    if (transaction.buyerId != currentUserId) {
+      throw Exception('Only the buyer can cancel this transaction');
+    }
+
+    // Update transaction status
+    await _transactionsRef.doc(transactionId).update({
+      'status': models.Transaction.STATUS_CANCELLED,
+      'updatedAt': Timestamp.now(),
+    });
+
+    // Update product status back to available - use the new method instead of updateProductStatus
+    await _marketplaceService.updateProductStatusForTransaction(
+      transaction.productId,
+      Product.STATUS_AVAILABLE,
+    );
+
+    // Notify seller
+    await _notificationsRef.add({
+      'userId': transaction.sellerId,
+      'title': 'Order Cancelled',
+      'message':
+          'Order for ${transaction.productTitle} has been cancelled by the buyer',
+      'read': false,
+      'createdAt': Timestamp.now(),
+    });
+  }
+
+  // Get buyer transactions
+  Stream<List<models.Transaction>> getBuyerTransactions() {
+    if (currentUserId == null) {
       return Stream.value([]);
     }
 
-    String field = asBuyer ? 'buyerId' : 'sellerId';
-
-    return _firestore
-        .collection('payments')
-        .where(field, isEqualTo: user.uid)
+    return _transactionsRef
+        .where('buyerId', isEqualTo: currentUserId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs
-              .map((doc) => Payment.fromFirestore(doc))
+              .map((doc) => models.Transaction.fromFirestore(doc))
               .toList();
         });
   }
-}
 
-extension PaymentExtension on Payment {
-  Payment copyWith({
-    String? id,
-    String? productId,
-    String? buyerId,
-    String? sellerId,
-    double? amount,
-    String? paymentMethod,
-    String? status,
-    DateTime? createdAt,
-    String? transactionId,
-    Map<String, dynamic>? paymentDetails,
-  }) {
-    return Payment(
-      id: id ?? this.id,
-      productId: productId ?? this.productId,
-      buyerId: buyerId ?? this.buyerId,
-      sellerId: sellerId ?? this.sellerId,
-      amount: amount ?? this.amount,
-      paymentMethod: paymentMethod ?? this.paymentMethod,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      transactionId: transactionId ?? this.transactionId,
-      paymentDetails: paymentDetails ?? this.paymentDetails,
-    );
+  // Get seller transactions
+  Stream<List<models.Transaction>> getSellerTransactions() {
+    if (currentUserId == null) {
+      return Stream.value([]);
+    }
+
+    return _transactionsRef
+        .where('sellerId', isEqualTo: currentUserId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => models.Transaction.fromFirestore(doc))
+              .toList();
+        });
+  }
+
+  // Get transaction by ID
+  Future<models.Transaction?> getTransactionById(String transactionId) async {
+    try {
+      DocumentSnapshot doc = await _transactionsRef.doc(transactionId).get();
+      if (doc.exists) {
+        return models.Transaction.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting transaction: $e');
+      return null;
+    }
+  }
+
+  // Get pending transactions count (for sellers)
+  Stream<int> getPendingTransactionsCount() {
+    if (currentUserId == null) {
+      return Stream.value(0);
+    }
+
+    return _transactionsRef
+        .where('sellerId', isEqualTo: currentUserId)
+        .where('status', isEqualTo: models.Transaction.STATUS_PENDING)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
 }

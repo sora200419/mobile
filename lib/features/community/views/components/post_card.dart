@@ -7,6 +7,7 @@ import 'package:mobiletesting/features/community/services/community_service.dart
 import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
 
 class PostCard extends StatefulWidget {
   final CommunityPost post;
@@ -21,6 +22,7 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   final CommunityService _communityService = CommunityService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   bool _isLiked = false;
 
   @override
@@ -173,15 +175,31 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildImages() {
-    if (widget.post.imageUrls.isEmpty) return const SizedBox.shrink();
+    if (widget.post.imageUrls.isEmpty) {
+      debugPrint('No images to display for post ${widget.post.id}');
+      return const SizedBox.shrink();
+    }
+
+    debugPrint(
+      'Building images for post ${widget.post.id}: ${widget.post.imageUrls}',
+    );
 
     if (widget.post.imageUrls.length == 1) {
+      final optimizedUrl = _cloudinaryService.getOptimizedImageUrl(
+        widget.post.imageUrls.first,
+        width: 800,
+        height: 400,
+        quality: 85,
+      );
+
+      debugPrint('Optimized URL for display: $optimizedUrl');
+
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: CachedNetworkImage(
-            imageUrl: widget.post.imageUrls.first,
+            imageUrl: optimizedUrl,
             height: 200,
             width: double.infinity,
             fit: BoxFit.cover,
@@ -195,7 +213,24 @@ class _PostCardState extends State<PostCard> {
                 (context, url, error) => Container(
                   height: 200,
                   color: Colors.grey.shade200,
-                  child: const Icon(Icons.error),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, size: 32, color: Colors.grey),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      Text(
+                        'Error: $error',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
           ),
         ),
@@ -222,7 +257,12 @@ class _PostCardState extends State<PostCard> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: CachedNetworkImage(
-                        imageUrl: widget.post.imageUrls[index],
+                        imageUrl: _cloudinaryService.getOptimizedImageUrl(
+                          widget.post.imageUrls[index],
+                          width: 200,
+                          height: 200,
+                          quality: 75,
+                        ),
                         height: 100,
                         width: 100,
                         fit: BoxFit.cover,
@@ -254,7 +294,12 @@ class _PostCardState extends State<PostCard> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
-                    imageUrl: widget.post.imageUrls[index],
+                    imageUrl: _cloudinaryService.getOptimizedImageUrl(
+                      widget.post.imageUrls[index],
+                      width: 200,
+                      height: 200,
+                      quality: 75,
+                    ),
                     height: 100,
                     width: 100,
                     fit: BoxFit.cover,

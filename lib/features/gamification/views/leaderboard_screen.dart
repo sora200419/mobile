@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mobiletesting/features/gamification/models/leaderboard_model.dart';
+import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
 
 class LeaderboardScreen extends StatefulWidget {

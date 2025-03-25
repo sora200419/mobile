@@ -1,77 +1,28 @@
-// lib\features\marketplace\services\marketplace_service.dart
-import 'dart:io';
+// lib/features/marketplace/services/marketplace_service.dart
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:mobiletesting/features/marketplace/models/product_model.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import '../models/product_model.dart';
 
 class MarketplaceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
-  // Add a new product listing with multiple images
-  Future<String> addProduct(Product product, List<File> imageFiles) async {
-    try {
-      // Upload all images and get their URLs
-      List<String> imageUrls = await uploadProductImages(imageFiles);
+  // Get current user ID
+  String? get currentUserId => _auth.currentUser?.uid;
 
-      // Create a new product with the image URLs
-      Product newProduct = Product(
-        title: product.title,
-        description: product.description,
-        price: product.price,
-        category: product.category,
-        condition: product.condition,
-        sellerId: product.sellerId,
-        sellerName: product.sellerName,
-        imageUrls: imageUrls,
-        createdAt: product.createdAt,
-        location: product.location,
-      );
+  // Collection references
+  CollectionReference get _productsRef => _firestore.collection('products');
+  CollectionReference get _favoritesRef => _firestore.collection('favorites');
+  CollectionReference get _usersRef => _firestore.collection('users');
 
-      // Add product to Firestore
-      DocumentReference docRef = await _firestore
-          .collection('products')
-          .add(newProduct.toMap());
-
-      return docRef.id;
-    } catch (e) {
-      print('Error adding product: $e');
-      throw e;
-    }
-  }
-
-  // Upload multiple product images
-  Future<List<String>> uploadProductImages(List<File> imageFiles) async {
-    List<String> imageUrls = [];
-
-    if (imageFiles.isEmpty) {
-      return imageUrls;
-    }
-
-    try {
-      for (int i = 0; i < imageFiles.length; i++) {
-        final storageRef = _storage.ref();
-        final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}_$i';
-        final imageRef = storageRef.child('product_images/$fileName');
-
-        await imageRef.putFile(imageFiles[i]);
-        String downloadUrl = await imageRef.getDownloadURL();
-        imageUrls.add(downloadUrl);
-      }
-
-      return imageUrls;
-    } catch (e) {
-      print('Error uploading images: $e');
-      throw e;
-    }
-  }
-
-  // Get all available products
+  // Get available products stream
   Stream<List<Product>> getAvailableProducts() {
-    return _firestore
-        .collection('products')
+    return _productsRef
         .where('status', isEqualTo: Product.STATUS_AVAILABLE)
         .orderBy('createdAt', descending: true)
         .snapshots()
@@ -84,10 +35,13 @@ class MarketplaceService {
 
   // Get products by category
   Stream<List<Product>> getProductsByCategory(String category) {
-    return _firestore
-        .collection('products')
-        .where('status', isEqualTo: Product.STATUS_AVAILABLE)
+    if (category == 'All') {
+      return getAvailableProducts();
+    }
+
+    return _productsRef
         .where('category', isEqualTo: category)
+        .where('status', isEqualTo: Product.STATUS_AVAILABLE)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -95,238 +49,355 @@ class MarketplaceService {
               .map((doc) => Product.fromFirestore(doc))
               .toList();
         });
-  }
-
-  // Get my products
-  Stream<List<Product>> getMyProducts() {
-    String userId = _auth.currentUser?.uid ?? '';
-
-    return _firestore
-        .collection('products')
-        .where('sellerId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Product.fromFirestore(doc))
-              .toList();
-        });
-  }
-
-  // Change product status (Available, Reserved, Sold)
-  Future<void> updateProductStatus(String productId, String status) async {
-    try {
-      await _firestore.collection('products').doc(productId).update({
-        'status': status,
-      });
-    } catch (e) {
-      print('Error updating product status: $e');
-      throw e;
-    }
-  }
-
-  // Delete a product
-  Future<void> deleteProduct(String productId) async {
-    try {
-      // Get the product to find its images
-      DocumentSnapshot doc =
-          await _firestore.collection('products').doc(productId).get();
-      Product product = Product.fromFirestore(doc);
-
-      // Delete the product document
-      await _firestore.collection('products').doc(productId).delete();
-
-      // Delete all associated images from storage
-      for (String imageUrl in product.imageUrls) {
-        try {
-          // Extract the path from the URL
-          final ref = _storage.refFromURL(imageUrl);
-          await ref.delete();
-        } catch (e) {
-          print('Error deleting image: $e');
-          // Continue with other images even if one fails
-        }
-      }
-    } catch (e) {
-      print('Error deleting product: $e');
-      throw e;
-    }
   }
 
   // Search products
   Stream<List<Product>> searchProducts(String query) {
-    query = query.toLowerCase();
+    // Convert query to lowercase for case-insensitive search
+    String lowercaseQuery = query.toLowerCase();
 
-    return _firestore
-        .collection('products')
+    // Get all available products and filter on the client side
+    return _productsRef
         .where('status', isEqualTo: Product.STATUS_AVAILABLE)
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Product.fromFirestore(doc))
-              .where(
-                (product) =>
-                    product.title.toLowerCase().contains(query) ||
-                    product.description.toLowerCase().contains(query) ||
-                    product.category.toLowerCase().contains(query),
-              )
-              .toList();
+          List<Product> allProducts =
+              snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList();
+
+          return allProducts.where((product) {
+            return product.title.toLowerCase().contains(lowercaseQuery) ||
+                product.description.toLowerCase().contains(lowercaseQuery) ||
+                product.category.toLowerCase().contains(lowercaseQuery) ||
+                product.location.toLowerCase().contains(lowercaseQuery);
+          }).toList();
         });
   }
 
-  // Increment view count
-  Future<void> incrementViewCount(String productId) async {
-    try {
-      await _firestore.collection('products').doc(productId).update({
-        'viewCount': FieldValue.increment(1),
-      });
-    } catch (e) {
-      print('Error incrementing view count: $e');
-      // Silent fail - not critical
-    }
-  }
-
-  // Get recently viewed products
-  Future<List<Product>> getRecentlyViewedProducts(
-    List<String> productIds,
-  ) async {
-    if (productIds.isEmpty) {
-      return [];
-    }
-
-    try {
-      // Get all products in the list of IDs
-      final querySnapshot =
-          await _firestore
-              .collection('products')
-              .where(FieldPath.documentId, whereIn: productIds)
-              .get();
-
-      return querySnapshot.docs
-          .map((doc) => Product.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      print('Error getting recently viewed products: $e');
-      return [];
-    }
-  }
-
-  // Filter products by price range
-  Stream<List<Product>> filterProductsByPrice(
-    double minPrice,
-    double maxPrice,
-  ) {
-    return _firestore
-        .collection('products')
-        .where('status', isEqualTo: Product.STATUS_AVAILABLE)
-        .where('price', isGreaterThanOrEqualTo: minPrice)
-        .where('price', isLessThanOrEqualTo: maxPrice)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Product.fromFirestore(doc))
-              .toList();
-        });
-  }
-
-  // Add a product to favorites
-  Future<void> addToFavorites(String productId) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('User not logged in');
-
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('favorites')
-          .doc(productId)
-          .set({'addedAt': FieldValue.serverTimestamp()});
-    } catch (e) {
-      print('Error adding to favorites: $e');
-      throw e;
-    }
-  }
-
-  // Remove a product from favorites
-  Future<void> removeFromFavorites(String productId) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('User not logged in');
-
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('favorites')
-          .doc(productId)
-          .delete();
-    } catch (e) {
-      print('Error removing from favorites: $e');
-      throw e;
-    }
-  }
-
-  // Check if a product is in favorites
-  Future<bool> isProductFavorite(String productId) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return false;
-
-      final doc =
-          await _firestore
-              .collection('users')
-              .doc(user.uid)
-              .collection('favorites')
-              .doc(productId)
-              .get();
-
-      return doc.exists;
-    } catch (e) {
-      print('Error checking favorite status: $e');
-      return false;
-    }
-  }
-
-  // Get all favorite products
-  Stream<List<Product>> getFavoriteProducts() {
-    final user = _auth.currentUser;
-    if (user == null) {
-      // Return empty stream if no user is logged in
+  // Get my products (user's listings)
+  Stream<List<Product>> getMyProducts() {
+    if (currentUserId == null) {
       return Stream.value([]);
     }
 
-    return _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('favorites')
+    return _productsRef
+        .where('sellerId', isEqualTo: currentUserId)
+        .orderBy('createdAt', descending: true)
         .snapshots()
-        .asyncMap((snapshot) async {
-          List<String> productIds = snapshot.docs.map((doc) => doc.id).toList();
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => Product.fromFirestore(doc))
+              .toList();
+        });
+  }
 
-          if (productIds.isEmpty) {
+  // Get favorite products for current user
+  Stream<List<Product>> getFavoriteProducts() {
+    if (currentUserId == null) {
+      return Stream.value([]);
+    }
+
+    // Get the IDs of favorite products
+    return _favoritesRef
+        .where('userId', isEqualTo: currentUserId)
+        .snapshots()
+        .asyncMap((favSnapshot) async {
+          List<String> favoriteIds =
+              favSnapshot.docs
+                  .map((doc) => doc['productId'] as String)
+                  .toList();
+
+          if (favoriteIds.isEmpty) {
             return [];
           }
 
-          // Get products by chunks of 10 (Firestore limitation for whereIn)
+          // Get the actual product documents
+          // We need to do this in batches if there are many favorites
           List<Product> products = [];
-          for (int i = 0; i < productIds.length; i += 10) {
-            final endIdx =
-                i + 10 < productIds.length ? i + 10 : productIds.length;
-            final chunk = productIds.sublist(i, endIdx);
 
-            final querySnapshot =
-                await _firestore
-                    .collection('products')
-                    .where(FieldPath.documentId, whereIn: chunk)
+          // Process in batches of 10 (Firestore limitation for 'in' queries)
+          for (int i = 0; i < favoriteIds.length; i += 10) {
+            int end =
+                (i + 10 < favoriteIds.length) ? i + 10 : favoriteIds.length;
+            List<String> batch = favoriteIds.sublist(i, end);
+
+            QuerySnapshot querySnapshot =
+                await _productsRef
+                    .where(FieldPath.documentId, whereIn: batch)
                     .get();
 
-            products.addAll(
-              querySnapshot.docs
-                  .map((doc) => Product.fromFirestore(doc))
-                  .toList(),
-            );
+            List<Product> batchProducts =
+                querySnapshot.docs
+                    .map((doc) => Product.fromFirestore(doc))
+                    .toList();
+
+            products.addAll(batchProducts);
           }
 
           return products;
         });
+  }
+
+  // Check if a product is in favorites
+  Future<bool> isProductFavorite(String productId) async {
+    if (currentUserId == null) {
+      return false;
+    }
+
+    QuerySnapshot querySnapshot =
+        await _favoritesRef
+            .where('userId', isEqualTo: currentUserId)
+            .where('productId', isEqualTo: productId)
+            .get();
+
+    return querySnapshot.docs.isNotEmpty;
+  }
+
+  // Add a product to favorites
+  Future<void> addToFavorites(String productId) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    await _favoritesRef.add({
+      'userId': currentUserId,
+      'productId': productId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Remove a product from favorites
+  Future<void> removeFromFavorites(String productId) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    QuerySnapshot querySnapshot =
+        await _favoritesRef
+            .where('userId', isEqualTo: currentUserId)
+            .where('productId', isEqualTo: productId)
+            .get();
+
+    for (var doc in querySnapshot.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // Add a new product
+  Future<String> addProduct(Product product) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Get the seller name from users collection
+    DocumentSnapshot userDoc = await _usersRef.doc(currentUserId).get();
+    String sellerName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
+
+    // Create a product with the seller info
+    Product productWithSeller = product.copyWith(
+      sellerId: currentUserId,
+      sellerName: sellerName,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    // Add to Firestore
+    DocumentReference docRef = await _productsRef.add(
+      productWithSeller.toFirestore(),
+    );
+    return docRef.id;
+  }
+
+  // Update a product
+  Future<void> updateProduct(Product product) async {
+    if (product.id == null) {
+      throw Exception('Product ID is required for update');
+    }
+
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Check if the user is the owner of the product
+    DocumentSnapshot docSnapshot = await _productsRef.doc(product.id).get();
+    Product existingProduct = Product.fromFirestore(docSnapshot);
+
+    if (existingProduct.sellerId != currentUserId) {
+      throw Exception('Only the seller can update this product');
+    }
+
+    // Update the product with new updatedAt timestamp
+    await _productsRef
+        .doc(product.id)
+        .update(product.copyWith(updatedAt: DateTime.now()).toFirestore());
+  }
+
+  // Delete a product
+  Future<void> deleteProduct(String productId) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Check if the user is the owner of the product
+    DocumentSnapshot docSnapshot = await _productsRef.doc(productId).get();
+    Product product = Product.fromFirestore(docSnapshot);
+
+    if (product.sellerId != currentUserId) {
+      throw Exception('Only the seller can delete this product');
+    }
+
+    // Delete the product
+    await _productsRef.doc(productId).delete();
+
+    // Log image URLs that would need cleanup in Cloudinary
+    if (product.imageUrl.isNotEmpty) {
+      print(
+        'Note: Image at ${product.imageUrl} should be removed from Cloudinary',
+      );
+    }
+
+    for (String imageUrl in product.additionalImages) {
+      print('Note: Image at ${imageUrl} should be removed from Cloudinary');
+    }
+
+    // Delete associated favorites
+    QuerySnapshot favoritesSnapshot =
+        await _favoritesRef.where('productId', isEqualTo: productId).get();
+
+    for (var doc in favoritesSnapshot.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // Update product status (available, reserved, sold)
+  Future<void> updateProductStatus(String productId, String status) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Check if the user is the owner of the product
+    DocumentSnapshot docSnapshot = await _productsRef.doc(productId).get();
+    Product product = Product.fromFirestore(docSnapshot);
+
+    if (product.sellerId != currentUserId) {
+      throw Exception('Only the seller can update this product status');
+    }
+
+    // Update status
+    await _productsRef.doc(productId).update({
+      'status': status,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  // NEW METHOD: Update product status during transaction (no seller check)
+  Future<void> updateProductStatusForTransaction(
+    String productId,
+    String status,
+  ) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Update status without checking if user is seller
+    await _productsRef.doc(productId).update({
+      'status': status,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  // Upload an image to Cloudinary
+  Future<String> uploadImage(File imageFile, {String? productId}) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Create a folder path for organizing images
+    String folder = 'marketplace/${currentUserId}/${productId ?? 'products'}';
+
+    // Upload using Cloudinary service
+    String downloadUrl = await _cloudinaryService.uploadImage(
+      imageFile,
+      folder: folder,
+    );
+
+    return downloadUrl;
+  }
+
+  // Pick an image from gallery or camera
+  Future<File?> pickImage({required ImageSource source}) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedFile = await picker.pickImage(
+      source: source,
+      imageQuality: 80, // Reduce image quality to save storage
+      maxWidth: 800, // Resize to reasonable dimensions
+    );
+
+    if (pickedFile != null) {
+      return File(pickedFile.path);
+    }
+
+    return null;
+  }
+
+  // Get product details by ID
+  Future<Product?> getProductById(String productId) async {
+    try {
+      DocumentSnapshot doc = await _productsRef.doc(productId).get();
+      if (doc.exists) {
+        return Product.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting product: $e');
+      return null;
+    }
+  }
+
+  // Get seller details
+  Future<Map<String, dynamic>> getSellerInfo(String sellerId) async {
+    try {
+      DocumentSnapshot doc = await _usersRef.doc(sellerId).get();
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? '',
+          'email': data['email'] ?? '',
+          'role': data['role'] ?? '',
+        };
+      }
+      return {'name': 'Unknown User'};
+    } catch (e) {
+      print('Error getting seller info: $e');
+      return {'name': 'Unknown User'};
+    }
+  }
+
+  // Contact seller (send message to the seller)
+  // This is a placeholder - in a real app, this would use a messaging service
+  Future<void> contactSeller(String sellerId, String message) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // This is where you would integrate with your messaging system
+    // For now, we'll just print the message
+    print('Message to $sellerId: $message');
+  }
+
+  // Get optimized version of a Cloudinary image URL
+  String getOptimizedImageUrl(
+    String originalUrl, {
+    int width = 800,
+    int height = 600,
+    int quality = 80,
+  }) {
+    return _cloudinaryService.getOptimizedImageUrl(
+      originalUrl,
+      width: width,
+      height: height,
+      quality: quality,
+    );
   }
 }

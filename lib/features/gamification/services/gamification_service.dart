@@ -2,6 +2,8 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobiletesting/features/gamification/constants/gamification_rules.dart';
+import 'package:mobiletesting/features/gamification/models/leaderboard_model.dart';
+import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
 
 class GamificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -17,41 +19,84 @@ class GamificationService {
       .collection('streaks');
   final CollectionReference challengesCollection = FirebaseFirestore.instance
       .collection('challenges');
+  final CollectionReference userActivitiesCollection = FirebaseFirestore
+      .instance
+      .collection('user_activities');
 
   // Award points to a user for an activity
   Future<void> awardPoints(String userId, int points, String activity) async {
     try {
       // Get current points
       DocumentSnapshot userDoc = await usersCollection.doc(userId).get();
+
+      // Check if user document exists
+      if (!userDoc.exists) {
+        print('User document does not exist for ID: $userId');
+        // Create user document with initial points (only if positive)
+        int initialPoints = points > 0 ? points : 0;
+        await usersCollection.doc(userId).set({
+          'points': initialPoints,
+          'level': 1,
+          'levelName': GamificationRules.getLevelName(1),
+        });
+
+        // Record the activity
+        await _recordActivity(userId, activity, 'Earned $initialPoints points');
+        return;
+      }
+
       int currentPoints =
           (userDoc.data() as Map<String, dynamic>)['points'] ?? 0;
-      int newPoints = currentPoints + points;
 
-      // Check if this awards a new level
+      // Calculate new points, ensuring we don't go below 0
+      int newPoints = currentPoints + points;
+      if (newPoints < 0) newPoints = 0;
+
+      // Check if this changes the level
       int currentLevel = (userDoc.data() as Map<String, dynamic>)['level'] ?? 1;
       int newLevel = _calculateLevel(newPoints);
-      bool leveledUp = newLevel > currentLevel;
+      bool levelChanged = newLevel != currentLevel;
 
       // Update user's points and level if needed
-      if (leveledUp) {
+      if (levelChanged) {
         await usersCollection.doc(userId).update({
           'points': newPoints,
           'level': newLevel,
           'levelName': GamificationRules.getLevelName(newLevel),
         });
 
-        // Add a level-up notification or event
-        await _recordActivity(
-          userId,
-          'level_up',
-          'Reached level $newLevel: ${GamificationRules.getLevelName(newLevel)}',
-        );
+        if (newLevel > currentLevel) {
+          // Level up notification
+          await _recordActivity(
+            userId,
+            'level_up',
+            'Reached level $newLevel: ${GamificationRules.getLevelName(newLevel)}',
+          );
+        } else {
+          // Level down notification
+          await _recordActivity(
+            userId,
+            'level_down',
+            'Dropped to level $newLevel: ${GamificationRules.getLevelName(newLevel)}',
+          );
+        }
       } else {
         await usersCollection.doc(userId).update({'points': newPoints});
       }
 
-      // Record the activity
-      await _recordActivity(userId, activity, 'Earned $points points');
+      // Record the activity with appropriate message based on point change
+      String actionMsg = points >= 0 ? 'Earned' : 'Lost';
+      int absPoints = points.abs();
+      await _recordActivity(userId, activity, '$actionMsg $absPoints points');
+
+      // Also store in the points_earned activity type for leaderboard calculations
+      await userActivitiesCollection.add({
+        'userId': userId,
+        'type': 'points_earned',
+        'points': points,
+        'activityType': activity,
+        'timestamp': DateTime.now(),
+      });
 
       // Check for achievements after point update
       await checkForAchievements(userId);
@@ -67,7 +112,7 @@ class GamificationService {
     String description,
   ) async {
     try {
-      await _firestore.collection('user_activities').add({
+      await userActivitiesCollection.add({
         'userId': userId,
         'type': type,
         'description': description,
@@ -95,6 +140,17 @@ class GamificationService {
   Future<UserProgress> getUserProgress(String userId) async {
     try {
       DocumentSnapshot userDoc = await usersCollection.doc(userId).get();
+
+      // If user document doesn't exist, create it with default values
+      if (!userDoc.exists) {
+        await usersCollection.doc(userId).set({
+          'points': 0,
+          'level': 1,
+          'levelName': GamificationRules.getLevelName(1),
+        });
+        userDoc = await usersCollection.doc(userId).get();
+      }
+
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
 
       int points = userData['points'] ?? 0;
@@ -142,6 +198,8 @@ class GamificationService {
   // Check and award achievements based on user activity
   Future<void> checkForAchievements(String userId) async {
     try {
+      print('Checking achievements for user: $userId');
+
       // Get user's current achievements
       QuerySnapshot achievementsSnapshot =
           await achievementsCollection.where('userId', isEqualTo: userId).get();
@@ -155,11 +213,16 @@ class GamificationService {
               )
               .toList();
 
+      print('Current achievements: $currentAchievements');
+
       // Check each possible achievement
       await _checkTaskMasterAchievement(userId, currentAchievements);
       await _checkFiveStarAchievement(userId, currentAchievements);
       await _checkTrustedPartnerAchievement(userId, currentAchievements);
       await _checkCategorySpecificAchievements(userId, currentAchievements);
+      await _checkEarlyBirdAchievement(userId, currentAchievements);
+      await _checkSpeedyDeliveryAchievement(userId, currentAchievements);
+
       // Add more achievement checks as needed
     } catch (e) {
       print('Error checking achievements: $e');
@@ -181,9 +244,14 @@ class GamificationService {
               .where('status', isEqualTo: 'completed')
               .get();
 
+      print(
+        'Task master check: Found ${completedTasksSnapshot.docs.length} completed tasks',
+      );
+
       if (completedTasksSnapshot.docs.length >= 10) {
         // Award the achievement
         await _awardAchievement(userId, 'task_master');
+        print('Awarded task_master achievement to user: $userId');
       }
     } catch (e) {
       print('Error checking task master achievement: $e');
@@ -206,12 +274,90 @@ class GamificationService {
               .where('rating', isEqualTo: 5.0)
               .get();
 
+      print(
+        'Five star check: Found ${ratingsSnapshot.docs.length} 5-star ratings',
+      );
+
       if (ratingsSnapshot.docs.length >= 5) {
         // Award the achievement
         await _awardAchievement(userId, 'five_star');
+        print('Awarded five_star achievement to user: $userId');
       }
     } catch (e) {
       print('Error checking five star achievement: $e');
+    }
+  }
+
+  // Achievement check: Early Bird (accept 5 tasks within 10 minutes of posting)
+  Future<void> _checkEarlyBirdAchievement(
+    String userId,
+    List<String> currentAchievements,
+  ) async {
+    if (currentAchievements.contains('early_bird')) return;
+
+    try {
+      // Count quick acceptances activities
+      QuerySnapshot quickAcceptanceSnapshot =
+          await userActivitiesCollection
+              .where('userId', isEqualTo: userId)
+              .where('type', isEqualTo: 'quick_acceptance')
+              .get();
+
+      print(
+        'Early bird check: Found ${quickAcceptanceSnapshot.docs.length} quick acceptances',
+      );
+
+      if (quickAcceptanceSnapshot.docs.length >= 5) {
+        // Award the achievement
+        await _awardAchievement(userId, 'early_bird');
+        print('Awarded early_bird achievement to user: $userId');
+      }
+    } catch (e) {
+      print('Error checking early bird achievement: $e');
+    }
+  }
+
+  // Achievement check: Speedy Delivery (complete 5 tasks ahead of schedule)
+  Future<void> _checkSpeedyDeliveryAchievement(
+    String userId,
+    List<String> currentAchievements,
+  ) async {
+    if (currentAchievements.contains('speedy_delivery')) return;
+
+    try {
+      // Get tasks completed by this user
+      QuerySnapshot completedTasksSnapshot =
+          await tasksCollection
+              .where('providerId', isEqualTo: userId)
+              .where('status', isEqualTo: 'completed')
+              .get();
+
+      // Count tasks completed early
+      int earlyCompletions = 0;
+
+      for (var doc in completedTasksSnapshot.docs) {
+        // Get associated activity for early completion
+        QuerySnapshot earlyCompletionSnapshot =
+            await userActivitiesCollection
+                .where('userId', isEqualTo: userId)
+                .where('taskId', isEqualTo: doc.id)
+                .where('type', isEqualTo: 'early_completion')
+                .get();
+
+        if (earlyCompletionSnapshot.docs.isNotEmpty) {
+          earlyCompletions++;
+        }
+      }
+
+      print('Speedy delivery check: Found $earlyCompletions early completions');
+
+      if (earlyCompletions >= 5) {
+        // Award the achievement
+        await _awardAchievement(userId, 'speedy_delivery');
+        print('Awarded speedy_delivery achievement to user: $userId');
+      }
+    } catch (e) {
+      print('Error checking speedy delivery achievement: $e');
     }
   }
 
@@ -240,9 +386,14 @@ class GamificationService {
               )
               .toSet();
 
+      print(
+        'Trusted partner check: Found ${uniqueRequesters.length} unique requesters',
+      );
+
       if (uniqueRequesters.length >= 10) {
         // Award the achievement
         await _awardAchievement(userId, 'trusted_partner');
+        print('Awarded trusted_partner achievement to user: $userId');
       }
     } catch (e) {
       print('Error checking trusted partner achievement: $e');
@@ -275,9 +426,14 @@ class GamificationService {
                 .where('category', isEqualTo: category)
                 .get();
 
+        print(
+          'Category achievement check for $category: Found ${categoryTasksSnapshot.docs.length} tasks',
+        );
+
         if (categoryTasksSnapshot.docs.length >= 5) {
           // Award the achievement
           await _awardAchievement(userId, achievement);
+          print('Awarded $achievement achievement to user: $userId');
         }
       } catch (e) {
         print('Error checking $achievement achievement: $e');
@@ -522,6 +678,18 @@ class GamificationService {
           GamificationRules.POINTS_EARLY_COMPLETION,
           'early_completion',
         );
+
+        // Log task ID with the early completion for achievement tracking
+        await userActivitiesCollection.add({
+          'userId': providerId,
+          'type': 'early_completion',
+          'taskId': taskId,
+          'timestamp': DateTime.now(),
+        });
+
+        print(
+          'Awarded early completion points to user: $providerId for task: $taskId',
+        );
       }
     } catch (e) {
       print('Error awarding early completion points: $e');
@@ -550,6 +718,18 @@ class GamificationService {
           GamificationRules.POINTS_QUICK_ACCEPTANCE,
           'quick_acceptance',
         );
+
+        // Log task ID with the quick acceptance for achievement tracking
+        await userActivitiesCollection.add({
+          'userId': providerId,
+          'type': 'quick_acceptance',
+          'taskId': taskId,
+          'timestamp': DateTime.now(),
+        });
+
+        print(
+          'Awarded quick acceptance points to user: $providerId for task: $taskId',
+        );
       }
     } catch (e) {
       print('Error awarding quick acceptance points: $e');
@@ -565,8 +745,7 @@ class GamificationService {
 
       // Check if user has already been awarded points for first task today
       QuerySnapshot activitySnapshot =
-          await _firestore
-              .collection('user_activities')
+          await userActivitiesCollection
               .where('userId', isEqualTo: userId)
               .where('type', isEqualTo: 'first_task_of_day')
               .where(
@@ -588,6 +767,7 @@ class GamificationService {
           GamificationRules.POINTS_FIRST_TASK_OF_DAY,
           'first_task_of_day',
         );
+        print('Awarded first task of day points to user: $userId');
       }
     } catch (e) {
       print('Error awarding first task of day points: $e');
@@ -631,11 +811,14 @@ class GamificationService {
         return data['status'] == 'completed';
       });
 
+      print(
+        'Weekly perfect completion check: All completed: $allCompleted, Task count: ${assignedTasksSnapshot.docs.length}',
+      );
+
       if (allCompleted) {
         // Check if user has already been awarded points for perfect week
         QuerySnapshot perfectWeekSnapshot =
-            await _firestore
-                .collection('user_activities')
+            await userActivitiesCollection
                 .where('userId', isEqualTo: userId)
                 .where('type', isEqualTo: 'perfect_week')
                 .where(
@@ -657,6 +840,7 @@ class GamificationService {
           List<String> currentAchievements = await getUserAchievements(userId);
           if (!currentAchievements.contains('perfect_week')) {
             await _awardAchievement(userId, 'perfect_week');
+            print('Awarded perfect_week achievement to user: $userId');
           }
         }
       }
@@ -692,42 +876,4 @@ class GamificationService {
       print('Error unlocking achievement: $e');
     }
   }
-}
-
-// User progress data model
-class UserProgress {
-  final String userId;
-  final int points;
-  final int level;
-  final String levelName;
-  final double progressToNextLevel;
-  final int pointsToNextLevel;
-  final int rank;
-
-  UserProgress({
-    required this.userId,
-    required this.points,
-    required this.level,
-    required this.levelName,
-    required this.progressToNextLevel,
-    required this.pointsToNextLevel,
-    required this.rank,
-  });
-}
-
-// Leaderboard entry data model
-class LeaderboardEntry {
-  final String userId;
-  final int rank;
-  final String username;
-  final int points;
-  final int level;
-
-  LeaderboardEntry({
-    required this.userId,
-    required this.rank,
-    required this.username,
-    required this.points,
-    required this.level,
-  });
 }
