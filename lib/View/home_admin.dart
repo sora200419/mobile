@@ -37,10 +37,14 @@ class _HomeAdminState extends State<HomeAdmin> {
             _currentIndex = index;
           });
         },
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.grey[600],
-        elevation: 8,
+
+        backgroundColor: Colors.teal,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white.withOpacity(0.6),
+        showSelectedLabels: true,
+        showUnselectedLabels: false,
+        elevation: 2,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -48,7 +52,7 @@ class _HomeAdminState extends State<HomeAdmin> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: "User Management",
+            label: "User",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
