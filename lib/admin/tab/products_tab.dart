@@ -32,7 +32,7 @@ class ProductsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.grey[100],
+      color: Colors.transparent, // 背景透明，继承父级背景色
       child: StreamBuilder<QuerySnapshot>(
         stream: products.snapshots(),
         builder: (context, snapshot) {

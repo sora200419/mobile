@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../post_details.dart';
+import '../details/post_details.dart';
+import '../details/comments_page.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class PostsTab extends StatefulWidget {
@@ -9,7 +10,9 @@ class PostsTab extends StatefulWidget {
 }
 
 class _PostsTabState extends State<PostsTab> {
-  final CollectionReference posts = FirebaseFirestore.instance.collection('community_posts');
+  final CollectionReference posts = FirebaseFirestore.instance.collection(
+    'community_posts',
+  );
   final ScrollController _scrollController = ScrollController();
   List<DocumentSnapshot> _postList = [];
   int _limit = 20;
@@ -41,20 +44,23 @@ class _PostsTabState extends State<PostsTab> {
     });
 
     try {
-      Query query = posts.orderBy(_sortField, descending: !_sortAscending).limit(_limit);
+      Query query = posts
+          .orderBy(_sortField, descending: !_sortAscending)
+          .limit(_limit);
       if (_lastDocument != null) {
         query = query.startAfterDocument(_lastDocument!);
       }
 
       QuerySnapshot snapshot = await query.get();
 
-      List<DocumentSnapshot> filteredDocs = snapshot.docs.where((doc) {
-        var data = doc.data() as Map<String, dynamic>;
-        String title = (data['title'] ?? '').toString().toLowerCase();
-        String content = (data['content'] ?? '').toString().toLowerCase();
-        String query = _searchQuery.toLowerCase();
-        return title.contains(query) || content.contains(query);
-      }).toList();
+      List<DocumentSnapshot> filteredDocs =
+          snapshot.docs.where((doc) {
+            var data = doc.data() as Map<String, dynamic>;
+            String title = (data['title'] ?? '').toString().toLowerCase();
+            String content = (data['content'] ?? '').toString().toLowerCase();
+            String query = _searchQuery.toLowerCase();
+            return title.contains(query) || content.contains(query);
+          }).toList();
 
       if (filteredDocs.length < _limit) {
         _hasMore = false;
@@ -137,7 +143,7 @@ class _PostsTabState extends State<PostsTab> {
                   ),
                   RadioListTile<String>(
                     title: Text("Filter by Report Count"),
-                    value: 'metadata.reportCount',
+                    value: 'reportCount',
                     groupValue: tempFilter,
                     onChanged: (value) {
                       setState(() {
@@ -207,141 +213,186 @@ class _PostsTabState extends State<PostsTab> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search Posts',
-                hintStyle: TextStyle(color: Colors.grey),
-                prefixIcon: Icon(Icons.search, color: Colors.grey),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                        color: Colors.grey,
-                      ),
-                      onPressed: _toggleSortOrder,
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search Posts',
+              hintStyle: TextStyle(color: Colors.grey),
+              prefixIcon: Icon(Icons.search, color: Colors.grey),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _sortAscending
+                          ? Icons.arrow_upward
+                          : Icons.arrow_downward,
+                      color: Colors.grey,
                     ),
-                    IconButton(
-                      icon: Icon(Icons.filter_list, color: Colors.grey),
-                      onPressed: _showFilterDialog,
-                    ),
-                  ],
-                ),
-                border: InputBorder.none,
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    onPressed: _toggleSortOrder,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.filter_list, color: Colors.grey),
+                    onPressed: _showFilterDialog,
+                  ),
+                ],
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                  _postList.clear();
-                  _lastDocument = null;
-                  _hasMore = true;
-                  _fetchPosts();
-                });
-              },
+              border: InputBorder.none,
+              filled: true,
+              fillColor: Colors.white, 
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(color: Colors.grey), 
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(color: Colors.grey),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(color: Colors.grey), 
+              ),
             ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+                _postList.clear();
+                _lastDocument = null;
+                _hasMore = true;
+                _fetchPosts();
+              });
+            },
           ),
         ),
+
         Expanded(
           child: Container(
-            color: Colors.grey[100],
-            child: _postList.isEmpty && !_isLoading
-                ? Center(
-                    child: Text(
-                      "No posts found",
-                      style: TextStyle(fontSize: 18, color: Colors.black54),
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    itemCount: _postList.length + (_isLoading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index < _postList.length) {
-                        var data = _postList[index].data() as Map<String, dynamic>;
-                        String createdAt = timeago.format(data['createdAt'].toDate());
-                        List<dynamic>? imageUrls = data['imageUrls'] as List<dynamic>?;
-                        String? firstImageUrl = (imageUrls != null && imageUrls.isNotEmpty) ? imageUrls[0] as String : null;
+            child:
+                _postList.isEmpty && !_isLoading
+                    ? Center(
+                      child: Text(
+                        "No posts found",
+                        style: TextStyle(fontSize: 18, color: Colors.black54),
+                      ),
+                    )
+                    : ListView.builder(
+                      controller: _scrollController,
+                      itemCount: _postList.length + (_isLoading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index < _postList.length) {
+                          var data =
+                              _postList[index].data() as Map<String, dynamic>;
+                          String createdAt = timeago.format(
+                            data['createdAt'].toDate(),
+                          );
+                          List<dynamic>? imageUrls =
+                              data['imageUrls'] as List<dynamic>?;
+                          String? firstImageUrl =
+                              (imageUrls != null && imageUrls.isNotEmpty)
+                                  ? imageUrls[0] as String
+                                  : null;
 
-                        return Card(
-                          elevation: 4,
-                          margin: EdgeInsets.all(8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: ListTile(
-                            contentPadding: EdgeInsets.all(16),
-                            leading: firstImageUrl != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      firstImageUrl,
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => CircleAvatar(
-                                        child: Text(data['userName']?[0] ?? 'U'),
+                          return Card(
+                            elevation: 4,
+                            margin: EdgeInsets.all(8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            color: Colors.white,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.all(16),
+                              leading:
+                                  firstImageUrl != null
+                                      ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          firstImageUrl,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  CircleAvatar(
+                                                    child: Text(
+                                                      data['userName']?[0] ??
+                                                          'U',
+                                                    ),
+                                                  ),
+                                        ),
+                                      )
+                                      : CircleAvatar(
+                                        child: Text(
+                                          data['userName']?[0] ?? 'U',
+                                        ),
                                       ),
+                              title: Text(
+                                data['title'] ?? 'No Title',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    data['content'] ?? 'No Content',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    '${data['userName'] ?? 'Unknown'} - $createdAt',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.comment,
+                                      color: Colors.grey,
                                     ),
-                                  )
-                                : CircleAvatar(
-                                    child: Text(data['userName']?[0] ?? 'U'),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => CommentsPage(
+                                                postId: _postList[index].id,
+                                              ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                            title: Text(
-                              data['title'] ?? 'No Title',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  data['content'] ?? 'No Content',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  '${data['userName'] ?? 'Unknown'} - $createdAt',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () =>
-                                      _confirmDelete(context, _postList[index].id),
-                                ),
-                              ],
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => PostDetailsPage(
-                                    postId: _postList[index].id,
+                                  IconButton(
+                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    onPressed:
+                                        () => _confirmDelete(
+                                          context,
+                                          _postList[index].id,
+                                        ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      } else if (_isLoading) {
-                        return Center(child: CircularProgressIndicator());
-                      } else {
-                        return Container();
-                      }
-                    },
-                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => PostDetailsPage(
+                                          postId: _postList[index].id,
+                                        ),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        } else if (_isLoading) {
+                          return Center(child: CircularProgressIndicator());
+                        } else {
+                          return Container();
+                        }
+                      },
+                    ),
           ),
         ),
       ],
