@@ -97,29 +97,19 @@ class _HomeStudentState extends State<HomeStudent> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () {
-                  // Menu functionality
-                },
+              Text(
+                "Hi $username,",
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Hi $username,",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Text(
-                    "let's start exploring.",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
+              const Text(
+                "let's start exploring.",
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             ],
           ),

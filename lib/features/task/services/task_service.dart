@@ -264,6 +264,18 @@ class TaskService {
       DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
       Task task = Task.fromFirestore(taskDoc);
 
+      // Only deduct points if the task is still in 'open' status
+      // This ensures we only deduct points if the task hasn't been accepted yet
+      if (task.status == 'open') {
+        // Deduct the points that were awarded for creating the task
+        await _gamificationService.awardPoints(
+          task.requesterId,
+          -GamificationRules
+              .POINTS_CREATE_TASK, // Negative value to deduct points
+          'cancel_task',
+        );
+      }
+
       // Stop location tracking if task is in transit
       if (task.status == 'in_transit' && task.providerId != null) {
         RunnerLocationService locationService = RunnerLocationService(

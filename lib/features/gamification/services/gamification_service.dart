@@ -32,47 +32,62 @@ class GamificationService {
       // Check if user document exists
       if (!userDoc.exists) {
         print('User document does not exist for ID: $userId');
-        // Create user document with initial points
+        // Create user document with initial points (only if positive)
+        int initialPoints = points > 0 ? points : 0;
         await usersCollection.doc(userId).set({
-          'points': points,
+          'points': initialPoints,
           'level': 1,
           'levelName': GamificationRules.getLevelName(1),
         });
 
         // Record the activity
-        await _recordActivity(userId, activity, 'Earned $points points');
+        await _recordActivity(userId, activity, 'Earned $initialPoints points');
         return;
       }
 
       int currentPoints =
           (userDoc.data() as Map<String, dynamic>)['points'] ?? 0;
-      int newPoints = currentPoints + points;
 
-      // Check if this awards a new level
+      // Calculate new points, ensuring we don't go below 0
+      int newPoints = currentPoints + points;
+      if (newPoints < 0) newPoints = 0;
+
+      // Check if this changes the level
       int currentLevel = (userDoc.data() as Map<String, dynamic>)['level'] ?? 1;
       int newLevel = _calculateLevel(newPoints);
-      bool leveledUp = newLevel > currentLevel;
+      bool levelChanged = newLevel != currentLevel;
 
       // Update user's points and level if needed
-      if (leveledUp) {
+      if (levelChanged) {
         await usersCollection.doc(userId).update({
           'points': newPoints,
           'level': newLevel,
           'levelName': GamificationRules.getLevelName(newLevel),
         });
 
-        // Add a level-up notification or event
-        await _recordActivity(
-          userId,
-          'level_up',
-          'Reached level $newLevel: ${GamificationRules.getLevelName(newLevel)}',
-        );
+        if (newLevel > currentLevel) {
+          // Level up notification
+          await _recordActivity(
+            userId,
+            'level_up',
+            'Reached level $newLevel: ${GamificationRules.getLevelName(newLevel)}',
+          );
+        } else {
+          // Level down notification
+          await _recordActivity(
+            userId,
+            'level_down',
+            'Dropped to level $newLevel: ${GamificationRules.getLevelName(newLevel)}',
+          );
+        }
       } else {
         await usersCollection.doc(userId).update({'points': newPoints});
       }
 
-      // Record the activity
-      await _recordActivity(userId, activity, 'Earned $points points');
+      // Record the activity with appropriate message based on point change
+      String actionMsg = points >= 0 ? 'Earned' : 'Lost';
+      int absPoints = points.abs();
+      await _recordActivity(userId, activity, '$actionMsg $absPoints points');
 
       // Also store in the points_earned activity type for leaderboard calculations
       await userActivitiesCollection.add({

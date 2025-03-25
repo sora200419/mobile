@@ -159,24 +159,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   child: Column(
                     children: [
                       ListTile(
-                        leading: const Icon(Icons.settings),
-                        title: const Text('Settings'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          // Navigate to settings
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.help_outline),
-                        title: const Text('Help & Support'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          // Navigate to help
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
                         leading: const Icon(Icons.logout, color: Colors.red),
                         title: const Text(
                           'Logout',
