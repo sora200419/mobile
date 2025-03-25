@@ -152,8 +152,8 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                 // Favorites Tab
                 _buildProductGrid(_marketplaceService.getFavoriteProducts()),
 
-                // Orders Tab
-                MyTransactionsScreen(),
+                // Orders Tab - Wrap with Material widget
+                const Material(child: MyTransactionsScreen()),
               ],
             ),
           ),

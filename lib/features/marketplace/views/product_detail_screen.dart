@@ -1,11 +1,13 @@
 // lib/features/marketplace/views/product_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:mobiletesting/features/marketplace/models/chat_model.dart';
 import '../models/product_model.dart';
+import '../models/transaction_model.dart' as models;
 import '../services/marketplace_service.dart';
 import '../services/chat_service.dart';
+import '../services/payment_service.dart';
 import 'edit_product_screen.dart';
 import 'checkout_screen.dart';
 import 'chat_screen.dart';
@@ -23,6 +25,7 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final MarketplaceService _marketplaceService = MarketplaceService();
   final ChatService _chatService = ChatService();
+  final PaymentService _paymentService = PaymentService();
   bool _isFavorite = false;
   bool _isLoading = false;
 
@@ -164,8 +167,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     setState(() => _isLoading = true);
     try {
       // Get transaction related to this product
-      QuerySnapshot querySnapshot =
-          await FirebaseFirestore.instance
+      firestore.QuerySnapshot querySnapshot =
+          await firestore.FirebaseFirestore.instance
               .collection('transactions')
               .where('productId', isEqualTo: widget.product.id)
               .where('buyerId', isEqualTo: _marketplaceService.currentUserId)
@@ -564,40 +567,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Show a simple message dialog for the assignment
-                        showDialog(
-                          context: context,
-                          builder:
-                              (context) => AlertDialog(
-                                title: const Text('Contact Seller'),
-                                content: Text(
-                                  'Would you like to message ${widget.product.sellerName}?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      // For assignment purposes, just show a confirmation
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Message sent to ${widget.product.sellerName}',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text('Send Message'),
-                                  ),
-                                ],
+                      onPressed: () async {
+                        setState(() => _isLoading = true);
+                        try {
+                          // Create a transaction for the chat
+                          String
+                          transactionId = await _paymentService.createTransaction(
+                            widget.product,
+                            models
+                                .Transaction
+                                .METHOD_CASH_ON_DELIVERY, // Use any payment method as placeholder
+                          );
+
+                          // Get or create chat for this transaction
+                          final chat = await _chatService
+                              .getChatByTransactionId(transactionId);
+
+                          setState(() => _isLoading = false);
+
+                          if (chat != null && mounted) {
+                            // Navigate to chat screen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => ChatScreen(chatId: chat.id!),
                               ),
-                        );
+                            );
+                          } else {
+                            throw Exception('Failed to create chat');
+                          }
+                        } catch (e) {
+                          setState(() => _isLoading = false);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error contacting seller: $e'),
+                              ),
+                            );
+                          }
+                        }
                       },
                       icon: const Icon(Icons.message),
                       label: const Text('CONTACT SELLER'),

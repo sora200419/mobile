@@ -33,34 +33,28 @@ class _MyTransactionsScreenState extends State<MyTransactionsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        TabBar(
+    // Wrap the entire widget with Scaffold to ensure proper Material ancestor
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Orders'),
+        bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.deepPurple,
           unselectedLabelColor: Colors.grey,
           indicatorColor: Colors.deepPurple,
           tabs: const [Tab(text: "Purchases"), Tab(text: "Sales")],
         ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Purchases tab
-              _buildTransactionsTab(
-                _paymentService.getBuyerTransactions(),
-                true,
-              ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Purchases tab
+          _buildTransactionsTab(_paymentService.getBuyerTransactions(), true),
 
-              // Sales tab
-              _buildTransactionsTab(
-                _paymentService.getSellerTransactions(),
-                false,
-              ),
-            ],
-          ),
-        ),
-      ],
+          // Sales tab
+          _buildTransactionsTab(_paymentService.getSellerTransactions(), false),
+        ],
+      ),
     );
   }
 

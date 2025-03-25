@@ -208,11 +208,13 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // Navigate to transactions screen
+                  // Navigate to transactions screen with proper Material ancestor
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const MyTransactionsScreen(),
+                      builder:
+                          (context) =>
+                              Scaffold(body: const MyTransactionsScreen()),
                     ),
                   );
                 },
