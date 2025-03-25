@@ -27,7 +27,7 @@ class PostDetailsPage extends StatelessWidget {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text("Delete Post"),
-          content: Text("Are you sure you want to delete this post?"),
+          content: Text("This action cannot be undone. Delete this post?"),
           actions: [
             TextButton(
               child: Text("Cancel"),
@@ -80,7 +80,7 @@ class PostDetailsPage extends StatelessWidget {
           icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: Colors.teal, // 使用主题色
+        backgroundColor: Colors.teal, 
         elevation: 2,
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
@@ -111,7 +111,7 @@ class PostDetailsPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Card(
-                elevation: 4, // 卡片阴影
+                elevation: 4, 
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -157,7 +157,7 @@ class PostDetailsPage extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.teal[800], // 使用主题色
+                                    color: Colors.teal[800],
                                   ),
                                 ),
                                 SizedBox(height: 4),
@@ -180,7 +180,7 @@ class PostDetailsPage extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  icon: Icon(Icons.delete_forever, color: Colors.red),
                                   onPressed: () => _confirmDelete(context),
                                 ),
                               ),

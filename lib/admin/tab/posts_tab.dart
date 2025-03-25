@@ -92,8 +92,8 @@ class _PostsTabState extends State<PostsTab> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("Delete"),
-          content: Text("Are you sure you want to delete this post?"),
+          title: Text("Delete Post"),
+          content: Text("This action cannot be undone. Delete this post?"),
           actions: [
             TextButton(
               child: Text("Cancel"),
@@ -364,7 +364,7 @@ class _PostsTabState extends State<PostsTab> {
                                     },
                                   ),
                                   IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    icon: Icon(Icons.delete_forever, color: Colors.red),
                                     onPressed:
                                         () => _confirmDelete(
                                           context,
