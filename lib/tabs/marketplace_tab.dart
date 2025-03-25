@@ -4,6 +4,7 @@ import 'package:mobiletesting/features/marketplace/models/product_model.dart';
 import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
 import 'package:mobiletesting/features/marketplace/widgets/product_card.dart';
+import 'package:mobiletesting/features/marketplace/views/my_transactions_screen.dart';
 
 class MarketplaceTab extends StatefulWidget {
   const MarketplaceTab({Key? key}) : super(key: key);
@@ -52,7 +53,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -100,6 +101,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
               Tab(text: "Browse"),
               Tab(text: "My Listings"),
               Tab(text: "Favorites"),
+              Tab(text: "Orders"),
             ],
           ),
 
@@ -116,6 +118,9 @@ class _MarketplaceTabState extends State<MarketplaceTab>
 
                 // Favorites Tab
                 _buildProductGrid(_marketplaceService.getFavoriteProducts()),
+
+                // Orders Tab
+                const MyTransactionsScreen(),
               ],
             ),
           ),

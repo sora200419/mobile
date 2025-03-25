@@ -290,6 +290,22 @@ class MarketplaceService {
     });
   }
 
+  // NEW METHOD: Update product status during transaction (no seller check)
+  Future<void> updateProductStatusForTransaction(
+    String productId,
+    String status,
+  ) async {
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Update status without checking if user is seller
+    await _productsRef.doc(productId).update({
+      'status': status,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
   // Upload an image to Cloudinary
   Future<String> uploadImage(File imageFile, {String? productId}) async {
     if (currentUserId == null) {
@@ -364,12 +380,12 @@ class MarketplaceService {
     if (currentUserId == null) {
       throw Exception('User not authenticated');
     }
-    
+
     // This is where you would integrate with your messaging system
     // For now, we'll just print the message
     print('Message to $sellerId: $message');
   }
-  
+
   // Get optimized version of a Cloudinary image URL
   String getOptimizedImageUrl(
     String originalUrl, {

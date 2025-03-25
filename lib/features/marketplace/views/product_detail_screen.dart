@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/product_model.dart';
 import '../services/marketplace_service.dart';
 import 'edit_product_screen.dart';
+import 'checkout_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -444,6 +445,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
 
                 const SizedBox(height: 24),
+
+                // Buy Now button for non-sellers
+                if (_marketplaceService.currentUserId !=
+                        widget.product.sellerId &&
+                    widget.product.status == Product.STATUS_AVAILABLE)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) =>
+                                    CheckoutScreen(product: widget.product),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.shopping_cart),
+                      label: const Text('BUY NOW'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+
+                if (_marketplaceService.currentUserId !=
+                        widget.product.sellerId &&
+                    widget.product.status == Product.STATUS_AVAILABLE)
+                  const SizedBox(height: 16),
 
                 // Contact seller button for non-sellers
                 if (_marketplaceService.currentUserId !=
