@@ -1,4 +1,4 @@
-import 'package:mobiletesting/View/home_student.dart';
+import 'package:mobiletesting/View/home_runner.dart';
 import 'package:mobiletesting/utils/constants/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -62,7 +62,7 @@ class MyApp extends StatelessWidget {
       home: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
           return authProvider.isAuthenticated
-              ? const HomeStudent()
+              ? HomeRunner()
               : const LoginScreen();
         },
       ),

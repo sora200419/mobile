@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
@@ -157,24 +158,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   child: Column(
                     children: [
-                      ListTile(
-                        leading: const Icon(Icons.settings),
-                        title: const Text('Settings'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          // Navigate to settings
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.help_outline),
-                        title: const Text('Help & Support'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          // Navigate to help
-                        },
-                      ),
-                      const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.logout, color: Colors.red),
                         title: const Text(

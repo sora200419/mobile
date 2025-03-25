@@ -1,28 +1,28 @@
-// lib\features\marketplace\models\product_model.dart
+// lib/features/marketplace/models/product_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Product {
-  final String? id;
-  final String title;
-  final String description;
-  final double price;
-  final String category;
-  final String condition;
-  final String sellerId;
-  final String sellerName;
-  final List<String> imageUrls;
-  final DateTime createdAt;
-  final String status;
-  final bool isFeatured;
-  final int viewCount;
-  final String location;
+  String? id;
+  String sellerId;
+  String sellerName;
+  String title;
+  String description;
+  double price;
+  String category;
+  String condition;
+  String location;
+  String imageUrl;
+  List<String> additionalImages;
+  String status;
+  DateTime createdAt;
+  DateTime updatedAt;
 
-  // Constants for product status
+  // Constants for status
   static const String STATUS_AVAILABLE = 'Available';
   static const String STATUS_RESERVED = 'Reserved';
   static const String STATUS_SOLD = 'Sold';
 
-  // Constants for product condition
+  // Constants for condition
   static const String CONDITION_NEW = 'New';
   static const String CONDITION_LIKE_NEW = 'Like New';
   static const String CONDITION_GOOD = 'Good';
@@ -31,99 +31,98 @@ class Product {
 
   Product({
     this.id,
+    required this.sellerId,
+    required this.sellerName,
     required this.title,
     required this.description,
     required this.price,
     required this.category,
     required this.condition,
-    required this.sellerId,
-    required this.sellerName,
-    required this.imageUrls,
-    required this.createdAt,
+    required this.location,
+    required this.imageUrl,
+    this.additionalImages = const [],
     this.status = STATUS_AVAILABLE,
-    this.isFeatured = false,
-    this.viewCount = 0,
-    this.location = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
-  // For backward compatibility with single image URLs
-  String get imageUrl => imageUrls.isNotEmpty ? imageUrls[0] : '';
-
+  // Factory method to create Product from Firestore data
   factory Product.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-    // Handle both single imageUrl and multiple imageUrls for compatibility
-    List<String> images = [];
-    if (data['imageUrls'] != null) {
-      images = List<String>.from(data['imageUrls']);
-    } else if (data['imageUrl'] != null) {
-      images = [data['imageUrl']];
-    }
-
     return Product(
       id: doc.id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
-      price: (data['price'] ?? 0).toDouble(),
-      category: data['category'] ?? '',
-      condition: data['condition'] ?? CONDITION_GOOD,
       sellerId: data['sellerId'] ?? '',
       sellerName: data['sellerName'] ?? '',
-      imageUrls: images,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      status: data['status'] ?? STATUS_AVAILABLE,
-      isFeatured: data['isFeatured'] ?? false,
-      viewCount: data['viewCount'] ?? 0,
+      title: data['title'] ?? '',
+      description: data['description'] ?? '',
+      price:
+          (data['price'] is int)
+              ? (data['price'] as int).toDouble()
+              : (data['price'] ?? 0.0),
+      category: data['category'] ?? '',
+      condition: data['condition'] ?? '',
       location: data['location'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
+      additionalImages: List<String>.from(data['additionalImages'] ?? []),
+      status: data['status'] ?? STATUS_AVAILABLE,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toMap() {
+  // Convert Product to a Map for Firestore
+  Map<String, dynamic> toFirestore() {
     return {
+      'sellerId': sellerId,
+      'sellerName': sellerName,
       'title': title,
       'description': description,
       'price': price,
       'category': category,
       'condition': condition,
-      'sellerId': sellerId,
-      'sellerName': sellerName,
-      'imageUrls': imageUrls,
-      'createdAt': createdAt,
-      'status': status,
-      'isFeatured': isFeatured,
-      'viewCount': viewCount,
       'location': location,
+      'imageUrl': imageUrl,
+      'additionalImages': additionalImages,
+      'status': status,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
     };
   }
 
-  // Create a copy of this product with updated fields
+  // Create a copy of the product with updated fields
   Product copyWith({
+    String? id,
+    String? sellerId,
+    String? sellerName,
     String? title,
     String? description,
     double? price,
     String? category,
     String? condition,
-    List<String>? imageUrls,
-    String? status,
-    bool? isFeatured,
-    int? viewCount,
     String? location,
+    String? imageUrl,
+    List<String>? additionalImages,
+    String? status,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Product(
-      id: this.id,
+      id: id ?? this.id,
+      sellerId: sellerId ?? this.sellerId,
+      sellerName: sellerName ?? this.sellerName,
       title: title ?? this.title,
       description: description ?? this.description,
       price: price ?? this.price,
       category: category ?? this.category,
       condition: condition ?? this.condition,
-      sellerId: this.sellerId,
-      sellerName: this.sellerName,
-      imageUrls: imageUrls ?? this.imageUrls,
-      createdAt: this.createdAt,
-      status: status ?? this.status,
-      isFeatured: isFeatured ?? this.isFeatured,
-      viewCount: viewCount ?? this.viewCount,
       location: location ?? this.location,
+      imageUrl: imageUrl ?? this.imageUrl,
+      additionalImages: additionalImages ?? this.additionalImages,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 }

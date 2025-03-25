@@ -1,29 +1,32 @@
-// lib/features/marketplace/views/add_product_screen.dart
+// lib/features/marketplace/views/edit_product_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/product_model.dart';
 import '../services/marketplace_service.dart';
 
-class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({Key? key}) : super(key: key);
+class EditProductScreen extends StatefulWidget {
+  final Product product;
+
+  const EditProductScreen({Key? key, required this.product}) : super(key: key);
 
   @override
-  State<AddProductScreen> createState() => _AddProductScreenState();
+  State<EditProductScreen> createState() => _EditProductScreenState();
 }
 
-class _AddProductScreenState extends State<AddProductScreen> {
+class _EditProductScreenState extends State<EditProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final MarketplaceService _marketplaceService = MarketplaceService();
 
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _priceController;
+  late TextEditingController _locationController;
 
-  String _selectedCategory = 'Books'; // Default category
-  String _selectedCondition = Product.CONDITION_NEW; // Default condition
-  File? _imageFile;
+  String _selectedCategory = '';
+  String _selectedCondition = '';
+  String _imageUrl = '';
+  List<String> _additionalImages = [];
   bool _isLoading = false;
 
   // List of product categories
@@ -45,6 +48,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.product.title);
+    _descriptionController = TextEditingController(
+      text: widget.product.description,
+    );
+    _priceController = TextEditingController(
+      text: widget.product.price.toString(),
+    );
+    _locationController = TextEditingController(text: widget.product.location);
+    _selectedCategory = widget.product.category;
+    _selectedCondition = widget.product.condition;
+    _imageUrl = widget.product.imageUrl;
+    _additionalImages = List.from(widget.product.additionalImages);
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
@@ -53,8 +73,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
-  // Pick an image from gallery or camera
-  Future<void> _pickImage() async {
+  // Update the product image
+  Future<void> _updateProductImage() async {
     final source = await showDialog<ImageSource>(
       context: context,
       builder:
@@ -80,75 +100,65 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (source == null) return;
 
+    setState(() => _isLoading = true);
+
     try {
-      final File? image = await _marketplaceService.pickImage(source: source);
-      if (image != null) {
-        setState(() => _imageFile = image);
+      final File? imageFile = await _marketplaceService.pickImage(
+        source: source,
+      );
+      if (imageFile != null) {
+        final String newImageUrl = await _marketplaceService.uploadImage(
+          imageFile,
+          productId: widget.product.id,
+        );
+        setState(() => _imageUrl = newImageUrl);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error uploading image: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  // Submit the product
-  Future<void> _submitProduct() async {
+  Future<void> _updateProduct() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Check if image is selected
-    if (_imageFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add an image for your product')),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
 
     try {
-      print('Starting product upload process');
-
-      // Upload image to Cloudinary
-      print('Uploading image to Cloudinary');
-      String imageUrl = await _marketplaceService.uploadImage(_imageFile!);
-      print('Image uploaded successfully: $imageUrl');
-
-      // Create product object
-      print('Creating product object');
-      Product newProduct = Product(
-        sellerId: _marketplaceService.currentUserId ?? '',
-        sellerName: '', // This will be filled in by the service
+      // Create updated product
+      Product updatedProduct = widget.product.copyWith(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         price: double.parse(_priceController.text.trim()),
         category: _selectedCategory,
         condition: _selectedCondition,
         location: _locationController.text.trim(),
-        imageUrl: imageUrl,
-        status: Product.STATUS_AVAILABLE, // Explicitly set status
-        createdAt: DateTime.now(),
+        imageUrl: _imageUrl,
+        additionalImages: _additionalImages,
+        updatedAt: DateTime.now(),
       );
 
-      // Add to Firestore
-      print('Adding product to Firestore');
-      String productId = await _marketplaceService.addProduct(newProduct);
-      print('Product added with ID: $productId');
+      // Save to Firestore
+      await _marketplaceService.updateProduct(updatedProduct);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Product added successfully')),
+          const SnackBar(content: Text('Product updated successfully')),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, updatedProduct);
       }
     } catch (e) {
-      print('Error in _submitProduct: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error adding product: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error updating product: $e')));
       }
     } finally {
       if (mounted) {
@@ -160,7 +170,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add New Product')),
+      appBar: AppBar(
+        title: const Text('Edit Product'),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : _updateProduct,
+            child: const Text('SAVE', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -179,7 +197,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             // Product image
             Center(
               child: GestureDetector(
-                onTap: _pickImage,
+                onTap: _updateProductImage,
                 child: Container(
                   width: double.infinity,
                   height: 200,
@@ -188,10 +206,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child:
-                      _imageFile != null
+                      _imageUrl.isNotEmpty
                           ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.file(_imageFile!, fit: BoxFit.cover),
+                            child: Image.network(
+                              _imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (context, error, stackTrace) => const Center(
+                                    child: Icon(
+                                      Icons.error,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                            ),
                           )
                           : const Center(
                             child: Column(
@@ -238,9 +267,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 border: OutlineInputBorder(),
                 prefixText: 'RM ',
               ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a price';
@@ -355,17 +382,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
             const SizedBox(height: 32),
 
-            // Submit button
+            // Update button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _submitProduct,
+                onPressed: _isLoading ? null : _updateProduct,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('ADD PRODUCT'),
+                child: const Text('UPDATE PRODUCT'),
               ),
             ),
           ],

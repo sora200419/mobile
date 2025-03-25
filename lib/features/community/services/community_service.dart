@@ -8,18 +8,22 @@ import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/community/models/community_post.dart';
 import 'package:mobiletesting/features/community/models/comment.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
 
 class CommunityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GamificationService _gamificationService = GamificationService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
   // Collection references
   CollectionReference get _postsCollection =>
       _firestore.collection('community_posts');
   CollectionReference _commentsCollection(String postId) =>
       _firestore.collection('community_posts/$postId/comments');
+  CollectionReference get _reportsCollection =>
+      _firestore.collection('reports');
 
   // Get all posts with optional filtering
   Stream<List<CommunityPost>> getPosts({PostType? filterType}) {
@@ -75,10 +79,19 @@ class CommunityService {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       final userName = userDoc['name'] ?? 'Anonymous';
 
-      // Upload images if any
+      // Upload images if any, with error handling
       List<String> imageUrls = [];
       if (images.isNotEmpty) {
-        imageUrls = await _uploadImages(images);
+        try {
+          debugPrint('Uploading ${images.length} images to Cloudinary');
+          imageUrls = await _uploadImages(images);
+          debugPrint(
+            'Successfully uploaded ${imageUrls.length} images: $imageUrls',
+          );
+        } catch (e) {
+          debugPrint('Warning: Failed to upload images: $e');
+          // Continue without images rather than failing the entire post creation
+        }
       }
 
       // Create post
@@ -91,10 +104,18 @@ class CommunityService {
         imageUrls: imageUrls,
         createdAt: DateTime.now(),
         metadata: metadata,
+        reportCount: 0,
       );
 
       // Save post to Firestore
       final docRef = await _postsCollection.add(post.toMap());
+
+      // Verify the post was saved with images
+      final savedDoc = await _postsCollection.doc(docRef.id).get();
+      final savedPost = CommunityPost.fromDocument(savedDoc);
+      debugPrint(
+        'Saved post with ${savedPost.imageUrls.length} images: ${savedPost.imageUrls}',
+      );
 
       // Award points for creating a post
       await _gamificationService.awardPoints(
@@ -117,22 +138,31 @@ class CommunityService {
 
       return docRef.id;
     } catch (e) {
+      debugPrint('Error in createPost: $e');
       throw Exception('Failed to create post: $e');
     }
   }
 
-  // Upload multiple images to Firebase Storage
+  // Upload multiple images using Cloudinary
   Future<List<String>> _uploadImages(List<File> images) async {
     List<String> urls = [];
 
     for (var image in images) {
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${image.path.split('/').last}';
-      final ref = _storage.ref().child('community_images/$fileName');
+      try {
+        debugPrint('Uploading image to Cloudinary: ${image.path}');
 
-      await ref.putFile(image);
-      final url = await ref.getDownloadURL();
-      urls.add(url);
+        // Use CloudinaryService instead of Firebase Storage
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          folder: 'community_posts', // Use a dedicated folder for community
+        );
+
+        urls.add(imageUrl);
+        debugPrint('Successfully uploaded image to Cloudinary: $imageUrl');
+      } catch (e) {
+        debugPrint('Error uploading image to Cloudinary: $e');
+        // Continue with other images rather than failing completely
+      }
     }
 
     return urls;
@@ -162,8 +192,13 @@ class CommunityService {
       List<String> updatedImageUrls = imagesToKeep ?? [];
 
       if (newImages != null && newImages.isNotEmpty) {
-        final newUrls = await _uploadImages(newImages);
-        updatedImageUrls.addAll(newUrls);
+        try {
+          final newUrls = await _uploadImages(newImages);
+          updatedImageUrls.addAll(newUrls);
+        } catch (e) {
+          debugPrint('Warning: Failed to upload new images: $e');
+          // Continue with the update using existing images
+        }
       }
 
       // Update the post
@@ -194,15 +229,8 @@ class CommunityService {
         throw Exception('You do not have permission to delete this post');
       }
 
-      // Delete images from storage
-      for (var imageUrl in post.imageUrls) {
-        try {
-          await _storage.refFromURL(imageUrl).delete();
-        } catch (e) {
-          // Continue even if image deletion fails
-          debugPrint('Failed to delete image: $e');
-        }
-      }
+      // We don't need to delete Cloudinary images as they can be managed through the Cloudinary dashboard
+      // or can be cleaned up using a serverless function if needed
 
       // Delete comments subcollection
       final commentsSnapshot = await _commentsCollection(postId).get();
@@ -361,5 +389,48 @@ class CommunityService {
 
       return title.contains(searchQuery) || content.contains(searchQuery);
     }).toList();
+  }
+
+  // Report a post
+  Future<void> reportPost({
+    required String postId,
+    required String reason,
+    String? additionalInfo,
+  }) async {
+    try {
+      final User? user = _auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Check if this user already reported this post
+      final existingReports =
+          await _reportsCollection
+              .where('postId', isEqualTo: postId)
+              .where('userId', isEqualTo: user.uid)
+              .get();
+
+      if (existingReports.docs.isNotEmpty) {
+        throw Exception('You have already reported this post');
+      }
+
+      // Create report document
+      final report = {
+        'postId': postId,
+        'userId': user.uid,
+        'reason': reason,
+        'additionalInfo': additionalInfo ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending', // For admin review
+      };
+
+      // Add report to Firestore
+      await _reportsCollection.add(report);
+
+      // Increment report count on the post
+      await _postsCollection.doc(postId).update({
+        'reportCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      throw Exception('Failed to submit report: $e');
+    }
   }
 }

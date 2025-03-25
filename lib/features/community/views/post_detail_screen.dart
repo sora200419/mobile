@@ -9,6 +9,8 @@ import 'package:mobiletesting/features/community/views/components/comment_sectio
 import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final CommunityPost post;
@@ -21,6 +23,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final CommunityService _communityService = CommunityService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   late Stream<CommunityPost?> _postStream;
 
   @override
@@ -78,6 +81,169 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         '${widget.post.title}\n\n${widget.post.content}\n\nShared from CampusLink';
 
     Share.share(postContent);
+  }
+
+  Future<void> _reportPost() async {
+    final reportReasons = [
+      'Inappropriate content',
+      'Spam or misleading',
+      'Hate speech',
+      'Harassment or bullying',
+      'Violence or threatening content',
+      'False information',
+      'Other',
+    ];
+
+    String? selectedReason;
+    String additionalInfo = '';
+    bool isSubmitting = false;
+
+    final reported = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(Icons.report_problem, color: Colors.deepPurple),
+                    const SizedBox(width: 8),
+                    const Text('Report Post'),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Why are you reporting this post?',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      for (final reason in reportReasons)
+                        RadioListTile<String>(
+                          title: Text(reason),
+                          value: reason,
+                          groupValue: selectedReason,
+                          activeColor: Colors.deepPurple,
+                          onChanged:
+                              isSubmitting
+                                  ? null
+                                  : (value) {
+                                    setState(() {
+                                      selectedReason = value;
+                                    });
+                                  },
+                        ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: 'Additional information (optional)',
+                          border: OutlineInputBorder(),
+                          hintText:
+                              'Please provide any details that might help us understand the issue',
+                          enabled: !isSubmitting,
+                        ),
+                        maxLines: 3,
+                        onChanged: (value) {
+                          additionalInfo = value;
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Note: Our moderation team will review this report within 24 hours',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed:
+                        isSubmitting
+                            ? null
+                            : () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed:
+                        (selectedReason == null || isSubmitting)
+                            ? null
+                            : () async {
+                              setState(() {
+                                isSubmitting = true;
+                              });
+
+                              try {
+                                await _communityService.reportPost(
+                                  postId: widget.post.id!,
+                                  reason: selectedReason!,
+                                  additionalInfo: additionalInfo,
+                                );
+
+                                if (context.mounted) {
+                                  Navigator.pop(context, true);
+                                }
+                              } catch (e) {
+                                setState(() {
+                                  isSubmitting = false;
+                                });
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e')),
+                                  );
+                                }
+                              }
+                            },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                    ),
+                    child:
+                        isSubmitting
+                            ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Submitting...'),
+                              ],
+                            )
+                            : const Text('Submit Report'),
+                  ),
+                ],
+              );
+            },
+          ),
+    );
+
+    if (reported == true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Report submitted. Thank you for keeping our community safe.',
+            ),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.deepPurple,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -144,53 +310,77 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             );
           }
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                PostCard(post: post, isDetailed: true),
-                if (post.type != PostType.general && post.metadata != null)
-                  _buildMetadataSection(post),
-                CommentSection(postId: post.id!),
-                const SizedBox(height: 32),
-              ],
-            ),
+          // Log image URLs for debugging
+          debugPrint(
+            'Rendering post with ${post.imageUrls.length} images: ${post.imageUrls}',
+          );
+
+          // Use CustomScrollView for better control of the scrolling behavior
+          return CustomScrollView(
+            slivers: [
+              SliverSafeArea(
+                bottom: false, // Don't add padding at bottom
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      PostCard(post: post, isDetailed: true),
+                      if (post.type != PostType.general &&
+                          post.metadata != null)
+                        _buildMetadataSection(post),
+                      _buildImagesSection(post),
+                      CommentSection(postId: post.id!),
+                      // Add extra padding to avoid bottom bar overlap
+                      SizedBox(
+                        height: MediaQuery.of(context).padding.bottom + 80,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
-      bottomNavigationBar: BottomAppBar(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildActionButton(
-                icon: Icons.share,
-                label: 'Share',
-                onPressed: _sharePost,
-              ),
-              _buildActionButton(
-                icon: Icons.bookmark_border,
-                label: 'Save',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Bookmark feature coming soon!'),
-                    ),
-                  );
-                },
-              ),
-              _buildActionButton(
-                icon: Icons.report_outlined,
-                label: 'Report',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Report feature coming soon!'),
-                    ),
-                  );
-                },
-              ),
-            ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, -1),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionButton(
+                  icon: Icons.share,
+                  label: 'Share',
+                  onPressed: _sharePost,
+                ),
+                _buildActionButton(
+                  icon: Icons.bookmark_border,
+                  label: 'Save',
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bookmark feature coming soon!'),
+                      ),
+                    );
+                  },
+                ),
+                _buildActionButton(
+                  icon: Icons.report_outlined,
+                  label: 'Report',
+                  onPressed: _reportPost,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -215,6 +405,77 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             Text(label, style: TextStyle(color: Colors.deepPurple.shade800)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildImagesSection(CommunityPost post) {
+    if (post.imageUrls.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Images',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: post.imageUrls.length,
+            itemBuilder: (context, index) {
+              final optimizedUrl = _cloudinaryService.getOptimizedImageUrl(
+                post.imageUrls[index],
+                width: 800,
+                height: 600,
+                quality: 85,
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: optimizedUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder:
+                        (context, url) => Container(
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                    errorWidget:
+                        (context, url, error) => Container(
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error,
+                                size: 32,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Image not available',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
