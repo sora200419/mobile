@@ -77,10 +77,17 @@ class CommunityService {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       final userName = userDoc['name'] ?? 'Anonymous';
 
-      // Upload images if any
+      // Upload images if any, with error handling
       List<String> imageUrls = [];
       if (images.isNotEmpty) {
-        imageUrls = await _uploadImages(images);
+        try {
+          debugPrint('Attempting to upload ${images.length} images');
+          imageUrls = await _uploadImages(images);
+          debugPrint('Successfully uploaded ${imageUrls.length} images');
+        } catch (e) {
+          debugPrint('Warning: Failed to upload images: $e');
+          // Continue without images rather than failing the entire post creation
+        }
       }
 
       // Create post
@@ -98,6 +105,7 @@ class CommunityService {
 
       // Save post to Firestore
       final docRef = await _postsCollection.add(post.toMap());
+      debugPrint('Post created with ID: ${docRef.id}');
 
       // Award points for creating a post
       await _gamificationService.awardPoints(
@@ -120,6 +128,7 @@ class CommunityService {
 
       return docRef.id;
     } catch (e) {
+      debugPrint('Error in createPost: $e');
       throw Exception('Failed to create post: $e');
     }
   }
@@ -129,13 +138,31 @@ class CommunityService {
     List<String> urls = [];
 
     for (var image in images) {
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${image.path.split('/').last}';
-      final ref = _storage.ref().child('community_images/$fileName');
+      try {
+        // Generate a simpler filename without path information
+        final fileName = 'image_${DateTime.now().millisecondsSinceEpoch}';
 
-      await ref.putFile(image);
-      final url = await ref.getDownloadURL();
-      urls.add(url);
+        // Ensure proper storage path structure
+        final ref = _storage.ref().child('community_images').child(fileName);
+
+        // Add content type metadata
+        final metadata = SettableMetadata(contentType: 'image/jpeg');
+
+        // Log the upload attempt
+        debugPrint('Attempting to upload image to: ${ref.fullPath}');
+
+        // Upload file with metadata
+        await ref.putFile(image, metadata);
+
+        // Get download URL after successful upload
+        final url = await ref.getDownloadURL();
+        urls.add(url);
+
+        debugPrint('Successfully uploaded image: $url');
+      } catch (e) {
+        debugPrint('Error uploading image: $e');
+        // Continue with other images instead of failing completely
+      }
     }
 
     return urls;
@@ -165,8 +192,13 @@ class CommunityService {
       List<String> updatedImageUrls = imagesToKeep ?? [];
 
       if (newImages != null && newImages.isNotEmpty) {
-        final newUrls = await _uploadImages(newImages);
-        updatedImageUrls.addAll(newUrls);
+        try {
+          final newUrls = await _uploadImages(newImages);
+          updatedImageUrls.addAll(newUrls);
+        } catch (e) {
+          debugPrint('Warning: Failed to upload new images: $e');
+          // Continue with the update using existing images
+        }
       }
 
       // Update the post

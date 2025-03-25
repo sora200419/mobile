@@ -26,7 +26,7 @@ class Transaction {
 
   // Constants for payment methods
   static const String METHOD_BANK_TRANSFER = 'Bank Transfer';
-  static const String METHOD_CASH_ON_DELIVERY = 'Cash on Delivery';
+  static const String METHOD_CASH_ON_DELIVERY = 'Meet-up Payment';
   static const String METHOD_E_WALLET = 'E-Wallet';
 
   Transaction({

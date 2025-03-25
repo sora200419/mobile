@@ -2,7 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:mobiletesting/features/marketplace/views/payment_sucess_screen.dart';
+import 'package:mobiletesting/features/marketplace/views/payment_success_screen.dart';
 import '../models/transaction_model.dart';
 import '../services/payment_service.dart';
 import '../utils/image_helper.dart';

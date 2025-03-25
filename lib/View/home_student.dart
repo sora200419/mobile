@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
 import 'package:provider/provider.dart';
@@ -220,9 +221,10 @@ class _HomeStudentState extends State<HomeStudent> {
             break;
           case 2: // Community tab
             // Create new community post
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Community feature coming soon!')),
-            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CreatePostScreen()),
+            ).then((_) => setState(() {}));
             break;
         }
       },

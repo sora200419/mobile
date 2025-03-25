@@ -1,7 +1,7 @@
 // lib/features/marketplace/views/payment_success_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/marketplace/views/manual_payment_screen.dart';
-import '../models/transaction_model.dart';
+import '../models/transaction_model.dart' as models;
 import '../services/payment_service.dart';
 import 'my_transactions_screen.dart';
 
@@ -21,7 +21,7 @@ class PaymentSuccessScreen extends StatefulWidget {
 
 class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
   final PaymentService _paymentService = PaymentService();
-  Transaction? _transaction;
+  models.Transaction? _transaction;
   bool _isLoading = true;
 
   @override
@@ -106,9 +106,9 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
 
             const SizedBox(height: 24),
 
-            // Payment instructions for Cash on Delivery
+            // Payment instructions for Meet-up Payment
             if (_transaction?.paymentMethod ==
-                Transaction.METHOD_CASH_ON_DELIVERY)
+                models.Transaction.METHOD_CASH_ON_DELIVERY)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -122,7 +122,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
                         Icon(Icons.info_outline, color: Colors.blue[700]),
                         const SizedBox(width: 8),
                         Text(
-                          'Cash on Delivery',
+                          'Meet-up Payment',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.blue[700],
@@ -132,7 +132,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'The seller will contact you to arrange pickup and payment.',
+                      'The seller will contact you through chat to arrange meet-up time and location for item handover and payment.',
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -141,7 +141,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
 
             // Payment instructions for other methods
             if (_transaction?.paymentMethod !=
-                Transaction.METHOD_CASH_ON_DELIVERY)
+                models.Transaction.METHOD_CASH_ON_DELIVERY)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -177,7 +177,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
             // Upload payment button
             if (widget.showUploadOption &&
                 _transaction?.paymentMethod !=
-                    Transaction.METHOD_CASH_ON_DELIVERY)
+                    models.Transaction.METHOD_CASH_ON_DELIVERY)
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(

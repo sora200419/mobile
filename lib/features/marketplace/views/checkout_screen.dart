@@ -1,6 +1,6 @@
 // lib/features/marketplace/views/checkout_screen.dart
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/marketplace/views/payment_sucess_screen.dart';
+import 'package:mobiletesting/features/marketplace/views/payment_success_screen.dart';
 import '../models/product_model.dart';
 import '../models/transaction_model.dart';
 import '../services/payment_service.dart';
@@ -142,7 +142,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           // Cash on delivery option
           _buildPaymentMethodCard(
-            title: 'Cash on Delivery',
+            title: 'Meet-up Payment',
             icon: Icons.money,
             onTap: () => _processPayment(Transaction.METHOD_CASH_ON_DELIVERY),
           ),
