@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:mobiletesting/View/status_tag.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -43,34 +45,8 @@ class TaskDetailsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Color(0xFFECF0ED),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.green, width: 1),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    color: Colors.green,
-                    size: 16,
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    task.status.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            StatusTag(status: task.status),
             SizedBox(height: 16),
-
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -125,10 +101,11 @@ class TaskDetailsPage extends StatelessWidget {
             SizedBox(height: 25),
             Divider(),
             SizedBox(height: 25),
+            if(task.status != 'completed')
             Center(
               child: ElevatedButton.icon(
                 onPressed: () {
-                  _updateTaskStatus(context, task.id!, task.status);
+                  _updateTask(context, task.id!, task.status);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _getButtonColor(task.status),
@@ -170,12 +147,31 @@ class TaskDetailsPage extends StatelessWidget {
     );
   }
 
-  void _updateTaskStatus(BuildContext context, String taskId, String currentStatus){
+  void _updateTask(BuildContext context, String taskId, String currentStatus) async {
     String newStatus;
-    switch(currentStatus){
+    switch (currentStatus) {
       case 'open':
         newStatus = 'assigned';
-        break;
+        // 获取当前 runner 的 uid 和 name
+        final FirebaseAuth auth = FirebaseAuth.instance;
+        final User? user = auth.currentUser;
+        if (user != null) {
+          final String providerId = user.uid;
+          final String providerName = await _getCurrentRunnerName();
+          try {
+            await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
+              'status': newStatus,
+              'providerId': providerId,
+              'providerName': providerName,
+            });
+            Navigator.pop(context);
+          } catch (error) {
+            print("Error updating task status: $error");
+          }
+        } else {
+          print("Error: User not logged in.");
+        }
+        return; // Update providerId and providerName when the status is 'open' only
       case 'assigned':
         newStatus = 'in_transit';
         break;
@@ -186,12 +182,30 @@ class TaskDetailsPage extends StatelessWidget {
         return;
     }
 
-    FirebaseFirestore.instance.collection('tasks').doc(taskId).update({'status': newStatus}).then((_){
+    try {
+      await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({'status': newStatus});
       Navigator.pop(context);
-    }).catchError((error){
+    } catch (error) {
       print("Error updating task status: $error");
-    });
+    }
+  }
+
+  Future<String> _getCurrentRunnerName() async {
+    try {
+      final FirebaseAuth auth = FirebaseAuth.instance;
+      final User? user = auth.currentUser;
+      if (user != null) {
+        final DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (userDoc.exists) {
+          return (userDoc.data() as Map<String, dynamic>)['name'] ?? 'Runner';
+        }
+      }
+    } catch (e) {
+      print("Error fetching user name: $e");
+    }
+    return 'Runner';
   }
 }
-
-// Todo: change color open assigned completed (getButtonColor fucntion)

@@ -279,15 +279,14 @@ class TaskService {
     }
   }
 
-  // Get task by status
-  Stream<List<Task>> getTasksByStatus(String status) {
-    return FirebaseFirestore.instance
-        .collection('tasks')
+  // Get tasks for current runner by status
+  Stream<List<Task>> getTasksForRunnerByStatus(String status) {
+    String userId = FirebaseAuth.instance.currentUser!.uid;
+    return tasksCollection
         .where('status', isEqualTo: status)
+        .where('providerId', isEqualTo: userId)
         .snapshots()
-        .map(
-          (snapshot) =>
-          snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList(),
-    );
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList());
   }
 }
