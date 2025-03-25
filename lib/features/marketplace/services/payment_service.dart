@@ -6,12 +6,14 @@ import '../models/product_model.dart';
 import '../models/transaction_model.dart' as models;
 import 'marketplace_service.dart';
 import 'cloudinary_service.dart';
+import 'chat_service.dart';
 
 class PaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final CloudinaryService _cloudinaryService = CloudinaryService();
   final MarketplaceService _marketplaceService = MarketplaceService();
+  final ChatService _chatService = ChatService();
 
   // Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;
@@ -54,6 +56,12 @@ class PaymentService {
       transaction.toFirestore(),
     );
 
+    // Assign the ID to the transaction
+    transaction = transaction.copyWith(id: docRef.id);
+
+    // Create a chat for this transaction
+    await _createChatForTransaction(transaction);
+
     // Update product status to reserved - use the new method instead of updateProductStatus
     await _marketplaceService.updateProductStatusForTransaction(
       product.id!,
@@ -70,6 +78,18 @@ class PaymentService {
     });
 
     return docRef.id;
+  }
+
+  // Create a chat for a transaction
+  Future<void> _createChatForTransaction(models.Transaction transaction) async {
+    try {
+      if (transaction.id != null) {
+        // Create a chat for this transaction
+        await _chatService.createChat(transaction);
+      }
+    } catch (e) {
+      print('Error creating chat for transaction: $e');
+    }
   }
 
   // Update transaction with payment details

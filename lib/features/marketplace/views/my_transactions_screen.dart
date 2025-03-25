@@ -1,9 +1,10 @@
 // lib/features/marketplace/views/my_transactions_screen.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/transaction_model.dart' as models;
 import '../services/payment_service.dart';
-import '../widgets/transaction_card.dart';
-import 'manual_payment_screen.dart';
+import '../services/chat_service.dart';
+import 'chat_screen.dart';
 
 class MyTransactionsScreen extends StatefulWidget {
   const MyTransactionsScreen({Key? key}) : super(key: key);
@@ -15,6 +16,7 @@ class MyTransactionsScreen extends StatefulWidget {
 class _MyTransactionsScreenState extends State<MyTransactionsScreen>
     with SingleTickerProviderStateMixin {
   final PaymentService _paymentService = PaymentService();
+  final ChatService _chatService = ChatService();
   late TabController _tabController;
 
   @override
@@ -31,27 +33,34 @@ class _MyTransactionsScreenState extends State<MyTransactionsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Orders'),
-        bottom: TabBar(
+    return Column(
+      children: [
+        TabBar(
           controller: _tabController,
           labelColor: Colors.deepPurple,
           unselectedLabelColor: Colors.grey,
           indicatorColor: Colors.deepPurple,
           tabs: const [Tab(text: "Purchases"), Tab(text: "Sales")],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Purchases tab
-          _buildTransactionsTab(_paymentService.getBuyerTransactions(), true),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Purchases tab
+              _buildTransactionsTab(
+                _paymentService.getBuyerTransactions(),
+                true,
+              ),
 
-          // Sales tab
-          _buildTransactionsTab(_paymentService.getSellerTransactions(), false),
-        ],
-      ),
+              // Sales tab
+              _buildTransactionsTab(
+                _paymentService.getSellerTransactions(),
+                false,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -101,212 +110,330 @@ class _MyTransactionsScreenState extends State<MyTransactionsScreen>
           itemCount: transactions.length,
           itemBuilder: (context, index) {
             models.Transaction transaction = transactions[index];
-            return TransactionCard(
-              transaction: transaction,
-              isBuyer: isBuyer,
-              onActionPressed: () => _handleActionPressed(transaction, isBuyer),
-            );
+            return _buildTransactionCard(transaction, isBuyer);
           },
         );
       },
     );
   }
 
-  void _handleActionPressed(models.Transaction transaction, bool isBuyer) {
-    if (isBuyer) {
-      // Buyer actions
-      if (transaction.status == models.Transaction.STATUS_PENDING &&
-          transaction.receiptUrl == null &&
-          transaction.paymentMethod !=
-              models.Transaction.METHOD_CASH_ON_DELIVERY) {
-        // Upload payment proof
+  Widget _buildTransactionCard(models.Transaction transaction, bool isBuyer) {
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (transaction.status) {
+      case models.Transaction.STATUS_PENDING:
+        statusColor = Colors.orange;
+        statusIcon = Icons.access_time;
+        break;
+      case models.Transaction.STATUS_COMPLETED:
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+      case models.Transaction.STATUS_REJECTED:
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        break;
+      case models.Transaction.STATUS_CANCELLED:
+        statusColor = Colors.grey;
+        statusIcon = Icons.cancel;
+        break;
+      default:
+        statusColor = Colors.blue;
+        statusIcon = Icons.info;
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status and date
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: statusColor.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        transaction.status,
+                        style: TextStyle(color: statusColor, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  DateFormat.yMMMd().format(transaction.createdAt),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            ),
+
+            const Divider(),
+
+            // Transaction details
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product image placeholder
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Icon(Icons.image, color: Colors.grey),
+                ),
+
+                const SizedBox(width: 12),
+
+                // Product and transaction details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        transaction.productTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isBuyer
+                            ? 'Seller: ${transaction.sellerName}'
+                            : 'Buyer: ${transaction.buyerName}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Payment: ${transaction.paymentMethod}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Price
+                Text(
+                  'RM ${transaction.amount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+
+            // Rejection reason (if any)
+            if (transaction.status == models.Transaction.STATUS_REJECTED &&
+                transaction.rejectionReason != null)
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red[700], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Rejected: ${transaction.rejectionReason}',
+                        style: TextStyle(color: Colors.red[700], fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Action buttons
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Chat button
+                  OutlinedButton.icon(
+                    onPressed: () => _openChat(transaction),
+                    icon: const Icon(Icons.chat, size: 16),
+                    label: const Text('Chat'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Action button based on status and role
+                  if (isBuyer &&
+                      transaction.status == models.Transaction.STATUS_PENDING)
+                    OutlinedButton.icon(
+                      onPressed: () => _cancelTransaction(transaction.id!),
+                      icon: const Icon(
+                        Icons.cancel,
+                        size: 16,
+                        color: Colors.red,
+                      ),
+                      label: const Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+
+                  if (!isBuyer &&
+                      transaction.status == models.Transaction.STATUS_PENDING)
+                    ElevatedButton.icon(
+                      onPressed: () => _confirmTransaction(transaction.id!),
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Confirm'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openChat(models.Transaction transaction) async {
+    try {
+      // Get chat for this transaction
+      final chat = await _chatService.getChatByTransactionId(transaction.id!);
+
+      if (chat != null && mounted) {
+        // Navigate to chat screen
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder:
-                (context) => ManualPaymentScreen(
-                  transactionId: transaction.id!,
-                  paymentMethod: transaction.paymentMethod,
-                ),
-          ),
+          MaterialPageRoute(builder: (context) => ChatScreen(chatId: chat.id!)),
         );
-      } else if (transaction.status == models.Transaction.STATUS_PENDING) {
-        // Cancel order
-        _showCancelConfirmation(transaction);
+      } else {
+        // Create a new chat if one doesn't exist
+        final chatId = await _chatService.createChat(transaction);
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ChatScreen(chatId: chatId)),
+          );
+        }
       }
-    } else {
-      // Seller actions
-      if (transaction.status == models.Transaction.STATUS_PENDING &&
-          transaction.receiptUrl != null) {
-        // Confirm payment
-        _showConfirmationOptions(transaction);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error opening chat: $e')));
       }
     }
   }
 
-  void _showCancelConfirmation(models.Transaction transaction) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Cancel Order'),
-            content: const Text('Are you sure you want to cancel this order?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('NO'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _paymentService.cancelTransaction(transaction.id!);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Order cancelled successfully'),
-                      ),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                },
-                child: const Text('YES'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showConfirmationOptions(models.Transaction transaction) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Payment Verification'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Verify payment receipt:'),
-                const SizedBox(height: 16),
-                if (transaction.receiptUrl != null &&
-                    transaction.receiptUrl!.isNotEmpty)
-                  Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: Image.network(
-                      transaction.receiptUrl!,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Text('Could not load receipt image'),
-                        );
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                Text('Reference: ${transaction.paymentReference ?? "N/A"}'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showRejectionDialog(transaction);
-                },
-                child: const Text('REJECT'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _paymentService.completeTransaction(transaction.id!);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Payment confirmed successfully'),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  }
-                },
-                child: const Text('CONFIRM'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showRejectionDialog(models.Transaction transaction) {
-    final TextEditingController reasonController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Reject Payment'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Please provide a reason for rejection:'),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: reasonController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter reason',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
+  Future<void> _cancelTransaction(String transactionId) async {
+    bool confirm =
+        await showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Cancel Order'),
+                content: const Text(
+                  'Are you sure you want to cancel this order?',
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('CANCEL'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('NO'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('YES'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () async {
-                  if (reasonController.text.trim().isEmpty) {
-                    return;
-                  }
+        ) ??
+        false;
 
-                  Navigator.pop(context);
-                  try {
-                    await _paymentService.rejectTransaction(
-                      transaction.id!,
-                      reasonController.text.trim(),
-                    );
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Payment rejected')),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  }
-                },
-                child: const Text('SUBMIT'),
+    if (!confirm) return;
+
+    try {
+      await _paymentService.cancelTransaction(transactionId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order cancelled successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _confirmTransaction(String transactionId) async {
+    bool confirm =
+        await showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Confirm Order'),
+                content: const Text('Mark this order as completed?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('CANCEL'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('CONFIRM'),
+                  ),
+                ],
               ),
-            ],
-          ),
-    );
+        ) ??
+        false;
+
+    if (!confirm) return;
+
+    try {
+      await _paymentService.completeTransaction(transactionId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order confirmed successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 }

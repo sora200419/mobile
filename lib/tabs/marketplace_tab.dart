@@ -2,9 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/marketplace/models/product_model.dart';
 import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
+import 'package:mobiletesting/features/marketplace/services/chat_service.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
-import 'package:mobiletesting/features/marketplace/widgets/product_card.dart';
 import 'package:mobiletesting/features/marketplace/views/my_transactions_screen.dart';
+import 'package:mobiletesting/features/marketplace/widgets/product_card.dart';
 
 class MarketplaceTab extends StatefulWidget {
   const MarketplaceTab({Key? key}) : super(key: key);
@@ -16,6 +17,7 @@ class MarketplaceTab extends StatefulWidget {
 class _MarketplaceTabState extends State<MarketplaceTab>
     with SingleTickerProviderStateMixin {
   final MarketplaceService _marketplaceService = MarketplaceService();
+  final ChatService _chatService = ChatService();
   final TextEditingController _searchController = TextEditingController();
 
   late TabController _tabController;
@@ -97,11 +99,42 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             labelColor: Colors.deepPurple,
             unselectedLabelColor: Colors.grey,
             indicatorColor: Colors.deepPurple,
-            tabs: const [
-              Tab(text: "Browse"),
-              Tab(text: "My Listings"),
-              Tab(text: "Favorites"),
-              Tab(text: "Orders"),
+            tabs: [
+              const Tab(text: "Browse"),
+              const Tab(text: "My Listings"),
+              const Tab(text: "Favorites"),
+              StreamBuilder<int>(
+                stream: _chatService.getTotalUnreadCount(),
+                builder: (context, snapshot) {
+                  int count = snapshot.data ?? 0;
+                  return Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text("Orders"),
+                        if (count > 0) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              count.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
             ],
           ),
 
@@ -120,7 +153,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                 _buildProductGrid(_marketplaceService.getFavoriteProducts()),
 
                 // Orders Tab
-                const MyTransactionsScreen(),
+                MyTransactionsScreen(),
               ],
             ),
           ),
@@ -353,10 +386,8 @@ class _MarketplaceTabState extends State<MarketplaceTab>
   }
 
   Widget _buildBrowseTab() {
-    print('Building Browse Tab');
     // If searching
     if (_searchQuery.isNotEmpty) {
-      print('Searching for: $_searchQuery');
       return _buildProductGrid(
         _marketplaceService.searchProducts(_searchQuery),
       );
@@ -364,14 +395,12 @@ class _MarketplaceTabState extends State<MarketplaceTab>
 
     // If category filter is applied
     if (_selectedCategory != 'All') {
-      print('Filtering by category: $_selectedCategory');
       return _buildProductGrid(
         _marketplaceService.getProductsByCategory(_selectedCategory),
       );
     }
 
     // Default: all available products
-    print('Loading all available products');
     return _buildProductGrid(_marketplaceService.getAvailableProducts());
   }
 
@@ -379,28 +408,15 @@ class _MarketplaceTabState extends State<MarketplaceTab>
     return StreamBuilder<List<Product>>(
       stream: productsStream,
       builder: (context, snapshot) {
-        print(
-          'Stream update: ${snapshot.connectionState}, data count: ${snapshot.data?.length ?? 0}',
-        );
-
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
-          print('Stream error: ${snapshot.error}');
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
         List<Product> products = snapshot.data ?? [];
-
-        // Log products for debugging
-        print('Products loaded: ${products.length}');
-        for (var product in products) {
-          print(
-            'Product: ${product.id} - ${product.title} - ${product.status}',
-          );
-        }
 
         // Apply additional filters
         if (_selectedCondition != 'All') {

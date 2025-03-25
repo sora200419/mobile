@@ -1,10 +1,14 @@
 // lib/features/marketplace/views/product_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mobiletesting/features/marketplace/models/chat_model.dart';
 import '../models/product_model.dart';
 import '../services/marketplace_service.dart';
+import '../services/chat_service.dart';
 import 'edit_product_screen.dart';
 import 'checkout_screen.dart';
+import 'chat_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -18,6 +22,7 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final MarketplaceService _marketplaceService = MarketplaceService();
+  final ChatService _chatService = ChatService();
   bool _isFavorite = false;
   bool _isLoading = false;
 
@@ -145,6 +150,57 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error deleting product: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _openChat() async {
+    if (widget.product.id == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      // Get transaction related to this product
+      QuerySnapshot querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('transactions')
+              .where('productId', isEqualTo: widget.product.id)
+              .where('buyerId', isEqualTo: _marketplaceService.currentUserId)
+              .limit(1)
+              .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        // No transaction found, show message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please purchase the item to chat with the seller'),
+            ),
+          );
+        }
+        return;
+      }
+
+      String transactionId = querySnapshot.docs.first.id;
+
+      // Get or create chat for this transaction
+      Chat? chat = await _chatService.getChatByTransactionId(transactionId);
+
+      if (chat != null && mounted) {
+        // Navigate to chat screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ChatScreen(chatId: chat.id!)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error opening chat: $e')));
       }
     } finally {
       if (mounted) {
@@ -476,6 +532,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 if (_marketplaceService.currentUserId !=
                         widget.product.sellerId &&
                     widget.product.status == Product.STATUS_AVAILABLE)
+                  const SizedBox(height: 16),
+
+                // Chat button for reserved products
+                if (_marketplaceService.currentUserId !=
+                        widget.product.sellerId &&
+                    widget.product.status == Product.STATUS_RESERVED)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _openChat,
+                      icon: const Icon(Icons.chat),
+                      label: const Text('CHAT WITH SELLER'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+
+                if (_marketplaceService.currentUserId !=
+                        widget.product.sellerId &&
+                    widget.product.status == Product.STATUS_RESERVED)
                   const SizedBox(height: 16),
 
                 // Contact seller button for non-sellers
