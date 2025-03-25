@@ -33,10 +33,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _rewardPointsController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedCategory = 'Other';
+  int _calculatedRewardPoints = 5; // Default base points
 
   bool _isLoading = false;
   bool _isLocationTrackingActive = false;
@@ -52,6 +52,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     'Other',
   ];
 
+  // Base points for each category
+  final Map<String, int> _categoryBasePoints = {
+    'Delivery': 8,
+    'Printing': 5,
+    'Tutoring': 10,
+    'Food': 7,
+    'Shopping': 9,
+    'Technical Help': 12,
+    'Other': 5,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -61,14 +72,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _titleController.text = widget.task!.title;
       _descriptionController.text = widget.task!.description;
       _locationController.text = widget.task!.location;
-      _rewardPointsController.text = widget.task!.rewardPoints.toString();
       _selectedDate = widget.task!.deadline;
       _selectedCategory = widget.task!.category;
+      _calculatedRewardPoints = widget.task!.rewardPoints;
 
       // Check if location tracking is active for this task
       if (widget.task!.status == 'in_transit') {
         _checkLocationTrackingStatus();
       }
+    } else {
+      // For new tasks, calculate initial points
+      _calculateRewardPoints();
     }
   }
 
@@ -96,8 +110,39 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _locationController.dispose();
-    _rewardPointsController.dispose();
     super.dispose();
+  }
+
+  // Calculate reward points based on task details
+  void _calculateRewardPoints() {
+    // Base points from selected category
+    int basePoints = _categoryBasePoints[_selectedCategory] ?? 5;
+
+    // Urgency factor: closer deadlines = more points
+    int daysUntilDeadline = _selectedDate.difference(DateTime.now()).inDays;
+    double urgencyMultiplier = 1.0;
+    if (daysUntilDeadline <= 1) {
+      urgencyMultiplier = 1.5; // Same day or next day
+    } else if (daysUntilDeadline <= 3) {
+      urgencyMultiplier = 1.2; // Within 3 days
+    }
+
+    // Description complexity factor (based on length)
+    double complexityFactor = 1.0;
+    int descriptionLength = _descriptionController.text.length;
+    if (descriptionLength > 100) {
+      complexityFactor = 1.2; // More detailed description
+    } else if (descriptionLength > 50) {
+      complexityFactor = 1.1; // Moderately detailed
+    }
+
+    // Calculate total points and round to nearest integer
+    double totalPoints = basePoints * urgencyMultiplier * complexityFactor;
+
+    // Set the calculated reward points
+    setState(() {
+      _calculatedRewardPoints = totalPoints.round();
+    });
   }
 
   // Display date picker
@@ -113,6 +158,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       setState(() {
         _selectedDate = picked;
       });
+      // Recalculate points when deadline changes
+      _calculateRewardPoints();
     }
   }
 
@@ -120,8 +167,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _createTask() async {
     if (_titleController.text.isEmpty ||
         _descriptionController.text.isEmpty ||
-        _locationController.text.isEmpty ||
-        _rewardPointsController.text.isEmpty) {
+        _locationController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in all fields'),
@@ -148,14 +194,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               .get();
       String userName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
 
-      // Create task object
+      // Create task object with calculated reward points
       Task newTask = Task(
         title: _titleController.text,
         description: _descriptionController.text,
         requesterId: user.uid,
         requesterName: userName,
         location: _locationController.text,
-        rewardPoints: int.parse(_rewardPointsController.text),
+        rewardPoints: _calculatedRewardPoints,
         deadline: _selectedDate,
         status: 'open',
         createdAt: DateTime.now(),
@@ -331,6 +377,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               border: OutlineInputBorder(),
             ),
             maxLength: 50,
+            onChanged: (_) => _calculateRewardPoints(),
           ),
           const SizedBox(height: 16),
 
@@ -343,6 +390,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
             maxLines: 3,
             maxLength: 200,
+            onChanged: (_) => _calculateRewardPoints(),
           ),
           const SizedBox(height: 16),
 
@@ -354,18 +402,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.location_on),
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Reward points field
-          TextField(
-            controller: _rewardPointsController,
-            decoration: const InputDecoration(
-              labelText: 'Reward Points',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.stars),
-            ),
-            keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
 
@@ -385,9 +421,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   );
                 }).toList(),
             onChanged: (String? newValue) {
-              setState(() {
-                _selectedCategory = newValue!;
-              });
+              if (newValue != null) {
+                setState(() {
+                  _selectedCategory = newValue;
+                });
+                _calculateRewardPoints();
+              }
             },
           ),
           const SizedBox(height: 16),
@@ -408,7 +447,43 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+
+          // Display calculated reward points
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.stars, color: Colors.amber, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Reward Points: $_calculatedRewardPoints',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Points are calculated based on task category, deadline urgency, and description length.',
+                        style: TextStyle(color: Colors.amber.shade800),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
 
           // Point explanation
           Container(

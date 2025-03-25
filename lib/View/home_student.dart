@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
