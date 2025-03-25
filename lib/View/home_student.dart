@@ -2,13 +2,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
-import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 
 // Import the tab widgets
 import 'package:mobiletesting/tabs/tasks_tab.dart';
@@ -220,7 +220,7 @@ class _HomeStudentState extends State<HomeStudent> {
             );
             break;
           case 2: // Community tab
-            // Create new community post
+            // UPDATED: Create new community post
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const CreatePostScreen()),

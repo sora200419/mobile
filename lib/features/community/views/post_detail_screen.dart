@@ -9,6 +9,8 @@ import 'package:mobiletesting/features/community/views/components/comment_sectio
 import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final CommunityPost post;
@@ -21,6 +23,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final CommunityService _communityService = CommunityService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   late Stream<CommunityPost?> _postStream;
 
   @override
@@ -307,6 +310,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             );
           }
 
+          // Log image URLs for debugging
+          debugPrint(
+            'Rendering post with ${post.imageUrls.length} images: ${post.imageUrls}',
+          );
+
           // Use CustomScrollView for better control of the scrolling behavior
           return CustomScrollView(
             slivers: [
@@ -319,6 +327,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       if (post.type != PostType.general &&
                           post.metadata != null)
                         _buildMetadataSection(post),
+                      _buildImagesSection(post),
                       CommentSection(postId: post.id!),
                       // Add extra padding to avoid bottom bar overlap
                       SizedBox(
@@ -396,6 +405,77 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             Text(label, style: TextStyle(color: Colors.deepPurple.shade800)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildImagesSection(CommunityPost post) {
+    if (post.imageUrls.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Images',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: post.imageUrls.length,
+            itemBuilder: (context, index) {
+              final optimizedUrl = _cloudinaryService.getOptimizedImageUrl(
+                post.imageUrls[index],
+                width: 800,
+                height: 600,
+                quality: 85,
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: optimizedUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder:
+                        (context, url) => Container(
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                    errorWidget:
+                        (context, url, error) => Container(
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error,
+                                size: 32,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Image not available',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

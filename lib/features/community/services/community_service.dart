@@ -8,12 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/community/models/community_post.dart';
 import 'package:mobiletesting/features/community/models/comment.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
 
 class CommunityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GamificationService _gamificationService = GamificationService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
   // Collection references
   CollectionReference get _postsCollection =>
@@ -81,9 +83,11 @@ class CommunityService {
       List<String> imageUrls = [];
       if (images.isNotEmpty) {
         try {
-          debugPrint('Attempting to upload ${images.length} images');
+          debugPrint('Uploading ${images.length} images to Cloudinary');
           imageUrls = await _uploadImages(images);
-          debugPrint('Successfully uploaded ${imageUrls.length} images');
+          debugPrint(
+            'Successfully uploaded ${imageUrls.length} images: $imageUrls',
+          );
         } catch (e) {
           debugPrint('Warning: Failed to upload images: $e');
           // Continue without images rather than failing the entire post creation
@@ -105,7 +109,13 @@ class CommunityService {
 
       // Save post to Firestore
       final docRef = await _postsCollection.add(post.toMap());
-      debugPrint('Post created with ID: ${docRef.id}');
+
+      // Verify the post was saved with images
+      final savedDoc = await _postsCollection.doc(docRef.id).get();
+      final savedPost = CommunityPost.fromDocument(savedDoc);
+      debugPrint(
+        'Saved post with ${savedPost.imageUrls.length} images: ${savedPost.imageUrls}',
+      );
 
       // Award points for creating a post
       await _gamificationService.awardPoints(
@@ -133,35 +143,25 @@ class CommunityService {
     }
   }
 
-  // Upload multiple images to Firebase Storage
+  // Upload multiple images using Cloudinary
   Future<List<String>> _uploadImages(List<File> images) async {
     List<String> urls = [];
 
     for (var image in images) {
       try {
-        // Generate a simpler filename without path information
-        final fileName = 'image_${DateTime.now().millisecondsSinceEpoch}';
+        debugPrint('Uploading image to Cloudinary: ${image.path}');
 
-        // Ensure proper storage path structure
-        final ref = _storage.ref().child('community_images').child(fileName);
+        // Use CloudinaryService instead of Firebase Storage
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          folder: 'community_posts', // Use a dedicated folder for community
+        );
 
-        // Add content type metadata
-        final metadata = SettableMetadata(contentType: 'image/jpeg');
-
-        // Log the upload attempt
-        debugPrint('Attempting to upload image to: ${ref.fullPath}');
-
-        // Upload file with metadata
-        await ref.putFile(image, metadata);
-
-        // Get download URL after successful upload
-        final url = await ref.getDownloadURL();
-        urls.add(url);
-
-        debugPrint('Successfully uploaded image: $url');
+        urls.add(imageUrl);
+        debugPrint('Successfully uploaded image to Cloudinary: $imageUrl');
       } catch (e) {
-        debugPrint('Error uploading image: $e');
-        // Continue with other images instead of failing completely
+        debugPrint('Error uploading image to Cloudinary: $e');
+        // Continue with other images rather than failing completely
       }
     }
 
@@ -229,15 +229,8 @@ class CommunityService {
         throw Exception('You do not have permission to delete this post');
       }
 
-      // Delete images from storage
-      for (var imageUrl in post.imageUrls) {
-        try {
-          await _storage.refFromURL(imageUrl).delete();
-        } catch (e) {
-          // Continue even if image deletion fails
-          debugPrint('Failed to delete image: $e');
-        }
-      }
+      // We don't need to delete Cloudinary images as they can be managed through the Cloudinary dashboard
+      // or can be cleaned up using a serverless function if needed
 
       // Delete comments subcollection
       final commentsSnapshot = await _commentsCollection(postId).get();
