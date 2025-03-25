@@ -2,9 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/marketplace/models/product_model.dart';
 import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
-import 'package:mobiletesting/features/marketplace/views/product_detail_screen.dart';
+import 'package:mobiletesting/features/marketplace/services/chat_service.dart';
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
-import 'package:mobiletesting/features/marketplace/views/favorites_screen.dart';
+import 'package:mobiletesting/features/marketplace/views/my_transactions_screen.dart';
+import 'package:mobiletesting/features/marketplace/widgets/product_card.dart';
 
 class MarketplaceTab extends StatefulWidget {
   const MarketplaceTab({Key? key}) : super(key: key);
@@ -16,13 +17,14 @@ class MarketplaceTab extends StatefulWidget {
 class _MarketplaceTabState extends State<MarketplaceTab>
     with SingleTickerProviderStateMixin {
   final MarketplaceService _marketplaceService = MarketplaceService();
+  final ChatService _chatService = ChatService();
   final TextEditingController _searchController = TextEditingController();
 
   late TabController _tabController;
   String _searchQuery = '';
   String _selectedCategory = 'All';
   bool _showFilters = false;
-  RangeValues _priceRange = RangeValues(0, 500);
+  RangeValues _priceRange = const RangeValues(0, 50000);
   String _selectedCondition = 'All';
   String _sortBy = 'Newest';
 
@@ -53,7 +55,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -67,11 +69,15 @@ class _MarketplaceTabState extends State<MarketplaceTab>
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => AddProductScreen()),
+            MaterialPageRoute(builder: (context) => const AddProductScreen()),
           );
+          // Force refresh after adding a product and switch to "My Listings" tab
+          setState(() {
+            _tabController.animateTo(1); // Index 1 is the "My Listings" tab
+          });
         },
         backgroundColor: Colors.deepPurple,
         child: const Icon(Icons.add),
@@ -93,10 +99,42 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             labelColor: Colors.deepPurple,
             unselectedLabelColor: Colors.grey,
             indicatorColor: Colors.deepPurple,
-            tabs: const [
-              Tab(text: "Browse"),
-              Tab(text: "My Listings"),
-              Tab(text: "Favorites"),
+            tabs: [
+              const Tab(text: "Browse"),
+              const Tab(text: "My Listings"),
+              const Tab(text: "Favorites"),
+              StreamBuilder<int>(
+                stream: _chatService.getTotalUnreadCount(),
+                builder: (context, snapshot) {
+                  int count = snapshot.data ?? 0;
+                  return Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text("Orders"),
+                        if (count > 0) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              count.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
             ],
           ),
 
@@ -113,6 +151,9 @@ class _MarketplaceTabState extends State<MarketplaceTab>
 
                 // Favorites Tab
                 _buildProductGrid(_marketplaceService.getFavoriteProducts()),
+
+                // Orders Tab
+                MyTransactionsScreen(),
               ],
             ),
           ),
@@ -225,14 +266,14 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             children: [
               Text(
                 'RM ${_priceRange.start.toInt()}',
-                style: TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12),
               ),
               Expanded(
                 child: RangeSlider(
                   values: _priceRange,
                   min: 0,
-                  max: 500,
-                  divisions: 50,
+                  max: 50000,
+                  divisions: 500,
                   labels: RangeLabels(
                     'RM ${_priceRange.start.toInt()}',
                     'RM ${_priceRange.end.toInt()}',
@@ -246,7 +287,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
               ),
               Text(
                 'RM ${_priceRange.end.toInt()}',
-                style: TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12),
               ),
             ],
           ),
@@ -320,13 +361,13 @@ class _MarketplaceTabState extends State<MarketplaceTab>
               OutlinedButton(
                 onPressed: () {
                   setState(() {
-                    _priceRange = RangeValues(0, 500);
+                    _priceRange = const RangeValues(0, 50000);
                     _selectedCondition = 'All';
                     _sortBy = 'Newest';
                     _selectedCategory = 'All';
                   });
                 },
-                child: Text('Reset'),
+                child: const Text('Reset'),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -335,7 +376,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                     _showFilters = false;
                   });
                 },
-                child: Text('Apply'),
+                child: const Text('Apply'),
               ),
             ],
           ),
@@ -440,150 +481,22 @@ class _MarketplaceTabState extends State<MarketplaceTab>
           itemCount: products.length,
           itemBuilder: (context, index) {
             Product product = products[index];
-            return _buildProductCard(product);
+            return FutureBuilder<bool>(
+              future: _marketplaceService.isProductFavorite(product.id ?? ''),
+              builder: (context, favoriteSnapshot) {
+                final isFavorite = favoriteSnapshot.data ?? false;
+                return ProductCard(
+                  product: product,
+                  isFavorite: isFavorite,
+                  onToggleFavorite:
+                      () => _toggleFavorite(product.id!, isFavorite),
+                );
+              },
+            );
           },
         );
       },
     );
-  }
-
-  Widget _buildProductCard(Product product) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      elevation: 2,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProductDetailScreen(product: product),
-            ),
-          );
-        },
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Product image
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    color: Colors.grey.shade200,
-                    child:
-                        product.imageUrl.isNotEmpty
-                            ? Image.network(product.imageUrl, fit: BoxFit.cover)
-                            : const Icon(
-                              Icons.image_not_supported,
-                              size: 50,
-                              color: Colors.grey,
-                            ),
-                  ),
-                ),
-
-                // Product info
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'RM ${product.price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Colors.deepPurple,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (product.location.isNotEmpty)
-                            Flexible(
-                              child: Text(
-                                product.location,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Status label for reserved or sold items
-            if (product.status != Product.STATUS_AVAILABLE)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  color:
-                      product.status == Product.STATUS_SOLD
-                          ? Colors.red.withOpacity(0.8)
-                          : Colors.orange.withOpacity(0.8),
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    product.status,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            // Favorite button (only shown in Browse tab)
-            if (_tabController.index == 0)
-              Positioned(
-                top: 5,
-                right: 5,
-                child: StreamBuilder<bool>(
-                  stream: _buildFavoriteStream(product.id),
-                  builder: (context, snapshot) {
-                    bool isFavorite = snapshot.data ?? false;
-                    return CircleAvatar(
-                      radius: 15,
-                      backgroundColor: Colors.white.withOpacity(0.7),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : Colors.grey,
-                          size: 18,
-                        ),
-                        onPressed:
-                            () => _toggleFavorite(product.id!, isFavorite),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Stream<bool> _buildFavoriteStream(String? productId) {
-    if (productId == null) return Stream.value(false);
-
-    return Stream.fromFuture(_marketplaceService.isProductFavorite(productId));
   }
 
   Future<void> _toggleFavorite(String productId, bool isFavorite) async {
@@ -593,6 +506,8 @@ class _MarketplaceTabState extends State<MarketplaceTab>
       } else {
         await _marketplaceService.addToFavorites(productId);
       }
+      // Force UI update
+      setState(() {});
     } catch (e) {
       ScaffoldMessenger.of(
         context,

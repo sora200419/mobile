@@ -93,7 +93,7 @@ class _HomeRunnerState extends State<HomeRunner> {
             ],
           ),
         ),
-        body: Column(
+        body: TabBarView(
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),

@@ -36,6 +36,9 @@ class TaskService {
         'create_task',
       );
 
+      // Log the activity for achievement tracking
+      await _recordTaskActivity(task.requesterId, 'create_task', docRef.id);
+
       return docRef.id;
     } catch (e) {
       print('Error creating task: $e');
@@ -109,6 +112,9 @@ class TaskService {
         'accept_task',
       );
 
+      // Log the activity for achievement tracking
+      await _recordTaskActivity(user.uid, 'accept_task', taskId);
+
       // Award quick acceptance bonus if applicable
       DateTime createdAt = task.createdAt;
       DateTime now = DateTime.now();
@@ -125,6 +131,9 @@ class TaskService {
         user.uid,
         'accept_task',
       );
+
+      // Check for achievements explicitly
+      await _gamificationService.checkForAchievements(user.uid);
     } catch (e) {
       print('Error accepting task: $e');
       throw e;
@@ -168,6 +177,12 @@ class TaskService {
         GamificationRules.POINTS_IN_TRANSIT,
         'task_in_transit',
       );
+
+      // Log the activity for achievement tracking
+      await _recordTaskActivity(providerId, 'task_in_transit', taskId);
+
+      // Check for achievements explicitly
+      await _gamificationService.checkForAchievements(providerId);
     } catch (e) {
       print('Error marking task as in transit: $e');
       throw e;
@@ -200,11 +215,25 @@ class TaskService {
           'complete_task_provider',
         );
 
+        // Log the activity for achievement tracking
+        await _recordTaskActivity(
+          task.providerId!,
+          'complete_task_provider',
+          taskId,
+        );
+
         // Award points to requester for task completion
         await _gamificationService.awardPoints(
           task.requesterId,
           GamificationRules.POINTS_COMPLETE_TASK_REQUESTER,
           'complete_task_requester',
+        );
+
+        // Log the activity for requester achievement tracking
+        await _recordTaskActivity(
+          task.requesterId,
+          'complete_task_requester',
+          taskId,
         );
 
         // Check for early completion bonus
@@ -217,6 +246,10 @@ class TaskService {
         await _gamificationService.checkWeeklyPerfectCompletion(
           task.providerId!,
         );
+
+        // Check for achievements explicitly for both provider and requester
+        await _gamificationService.checkForAchievements(task.providerId!);
+        await _gamificationService.checkForAchievements(task.requesterId);
       }
     } catch (e) {
       print('Error completing task: $e');
@@ -240,9 +273,35 @@ class TaskService {
       }
 
       await tasksCollection.doc(taskId).update({'status': 'cancelled'});
+
+      // Log cancellation for both requester and provider (if assigned)
+      await _recordTaskActivity(task.requesterId, 'cancel_task', taskId);
+
+      if (task.providerId != null) {
+        await _recordTaskActivity(task.providerId!, 'cancel_task', taskId);
+      }
     } catch (e) {
       print('Error cancelling task: $e');
       throw e;
+    }
+  }
+
+  // Record task activity for achievement tracking
+  Future<void> _recordTaskActivity(
+    String userId,
+    String activityType,
+    String taskId,
+  ) async {
+    try {
+      await FirebaseFirestore.instance.collection('user_activities').add({
+        'userId': userId,
+        'type': activityType,
+        'taskId': taskId,
+        'timestamp': DateTime.now(),
+      });
+    } catch (e) {
+      print('Error recording task activity: $e');
+      // Don't throw here to avoid disrupting the main flow
     }
   }
 
@@ -286,7 +345,9 @@ class TaskService {
         .where('status', isEqualTo: status)
         .where('providerId', isEqualTo: userId)
         .snapshots()
-        .map((snapshot) =>
-        snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => Task.fromFirestore(doc)).toList(),
+        );
   }
 }
