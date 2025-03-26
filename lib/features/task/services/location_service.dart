@@ -54,12 +54,13 @@ class RunnerLocationService {
   }
 
   // Start sharing location for a specific task
-  Future<void> startSharingLocation(String taskId) async {
-    if (_isTrackingEnabled) return; // Already tracking
+  Future<bool> startSharingLocation(String taskId, [BuildContext? context]) async {
+    if (_isTrackingEnabled) return true; // Already tracking
 
-    await _initializeLocationService();
 
     try {
+      await _initializeLocationService();
+
       await _location.enableBackgroundMode(enable: true);
       _isTrackingEnabled = true;
 
@@ -82,10 +83,11 @@ class RunnerLocationService {
       });
 
       debugPrint('Location tracking started for task $taskId');
+      return true;
     } catch (e) {
       debugPrint('Error starting location tracking: $e');
       _isTrackingEnabled = false;
-      rethrow;
+      return false;
     }
   }
 

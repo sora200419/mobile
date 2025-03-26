@@ -12,6 +12,12 @@
         android:label="mobiletesting"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!-- Google API KEY -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBRrtdOMJ_cAhyLdeEHBzawwOQTMbKZ6Rs" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -39,11 +45,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
-        <!-- Google API KEY -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAE6q639V9jaA3RA8IopEB0A6voYpyN2go" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
