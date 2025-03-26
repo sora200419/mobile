@@ -8,10 +8,7 @@ import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
+import 'package:mobiletesting/features/community/services/post_share_service.dart';
 
 class PostCard extends StatefulWidget {
   final CommunityPost post;
@@ -27,6 +24,7 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   final CommunityService _communityService = CommunityService();
   final CloudinaryService _cloudinaryService = CloudinaryService();
+  final PostShareService _postShareService = PostShareService();
   bool _isLiked = false;
   bool _isBookmarked = false;
   bool _isShareLoading = false;
@@ -103,49 +101,14 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _sharePost() async {
-    if (_isShareLoading) return;
+    if (_isShareLoading || widget.post.id == null) return;
 
     setState(() {
       _isShareLoading = true;
     });
 
     try {
-      // Get post content
-      final String postText =
-          '${widget.post.title}\n\n${widget.post.content}\n\nShared from CampusLink';
-
-      // Check if post has images
-      if (widget.post.imageUrls.isNotEmpty) {
-        try {
-          // Show loading indicator
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Preparing content to share...')),
-          );
-
-          // Download the first image to a temporary file
-          final http.Response response = await http.get(
-            Uri.parse(widget.post.imageUrls.first),
-          );
-          final Directory tempDir = await getTemporaryDirectory();
-          final String filePath = '${tempDir.path}/shared_image.jpg';
-          final File file = File(filePath);
-          await file.writeAsBytes(response.bodyBytes);
-
-          // Share text and image
-          await Share.shareXFiles(
-            [XFile(filePath)],
-            text: postText,
-            subject: widget.post.title,
-          );
-        } catch (e) {
-          debugPrint('Error sharing with image, falling back to text: $e');
-          // If image sharing fails, fall back to text-only sharing
-          await Share.share(postText, subject: widget.post.title);
-        }
-      } else {
-        // Share only text
-        await Share.share(postText, subject: widget.post.title);
-      }
+      await _postShareService.sharePost(context, widget.post);
     } catch (e) {
       debugPrint('Error sharing post: $e');
       if (mounted) {
