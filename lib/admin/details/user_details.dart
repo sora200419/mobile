@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/admin/details/comments_page.dart';
 import 'package:mobiletesting/admin/details/post_details.dart';
 import 'package:mobiletesting/admin/details/product_details.dart';
 
@@ -271,7 +270,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     return StreamBuilder<QuerySnapshot>(
       stream:
           FirebaseFirestore.instance
-              .collection('community__posts')
+              .collection('community_posts')
               .where('userId', isEqualTo: userId)
               .snapshots(),
       builder: (context, snapshot) {
@@ -279,7 +278,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Text('Error loading posts: ${snapshot.error}'); 
+          return Text('Error loading posts: ${snapshot.error}');
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Text('No posts found');
@@ -290,14 +289,17 @@ class _UserDetailPageState extends State<UserDetailPage> {
               snapshot.data!.docs.map((doc) {
                 var post = doc.data() as Map<String, dynamic>;
                 String createdAt = _formatDate(post['createdAt'] as Timestamp?);
+                String postContent = post['content'] ?? '';
+                // cut the content too long
+                String displayContent =
+                    postContent.length > 50
+                        ? '${postContent.substring(0, 50)}...'
+                        : postContent;
                 return ListTile(
                   title: Text(post['title'] ?? 'Untitled'),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(post['content'] ?? ''),
-                      Text('Date: $createdAt'),
-                    ],
+                    children: [Text(displayContent), Text('Date: $createdAt')],
                   ),
                   onTap: () {
                     Navigator.push(
@@ -339,23 +341,53 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 String createdAt = _formatDate(
                   comment['createdAt'] as Timestamp?,
                 );
-                return ListTile(
-                  title: Text(comment['content'] ?? 'No content'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Post ID: ${comment['postId']}'),
-                      Text('Date: $createdAt'),
-                    ],
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) =>
-                                CommentsPage(postId: comment['postId']),
+                String commentContent = comment['content'] ?? 'No content';
+                // cut the content too long
+                String displayContent =
+                    commentContent.length > 50
+                        ? '${commentContent.substring(0, 50)}...'
+                        : commentContent;
+
+                // get community_posts for title
+                return FutureBuilder<DocumentSnapshot>(
+                  future: doc.reference.parent.parent!.get(),
+                  builder: (context, postSnapshot) {
+                    if (postSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const ListTile(title: Text('Loading...'));
+                    }
+                    if (postSnapshot.hasError) {
+                      return const ListTile(
+                        title: Text('Error loading post title'),
+                      );
+                    }
+                    if (!postSnapshot.hasData || !postSnapshot.data!.exists) {
+                      return const ListTile(title: Text('Post not found'));
+                    }
+
+                    var post =
+                        postSnapshot.data!.data() as Map<String, dynamic>;
+                    String postTitle = post['title'] ?? 'Untitled';
+
+                    return ListTile(
+                      title: Text(postTitle),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(displayContent),
+                          Text('Date: $createdAt'),
+                        ],
                       ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) =>
+                                    PostDetailsPage(postId: comment['postId']),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -377,7 +409,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Text('Error loading products: ${snapshot.error}'); 
+          return Text('Error loading products: ${snapshot.error}');
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Text('No products found');

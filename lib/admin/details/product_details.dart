@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:mobiletesting/admin/details/user_details.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   final String productId;
@@ -173,35 +174,60 @@ Widget _buildImageGallery() {
     );
   }
 
-  Widget _buildInfoCard(String title, String value) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 100,
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal,
-                ),
+  Widget _buildInfoCard(BuildContext context, String title, String value, {String? userId}) {
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
               ),
             ),
-            Expanded(
-              child: Text(value, style: const TextStyle(color: Colors.black87)),
-            ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: title == 'Seller' && userId != null
+                ? GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserDetailPage(
+                            userId: userId,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        color: Colors.teal,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: const TextStyle(color: Colors.black87),
+                  ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
+    String sellerId = productData['sellerId'] ?? '';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Product Details'),
@@ -299,25 +325,28 @@ Widget _buildImageGallery() {
 
           // Product Info Section
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildImageGallery(),
-                  const SizedBox(height: 16),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildImageGallery(),
+                const SizedBox(height: 16),
 
-                  // Key Product Information
-                  _buildInfoCard('Status', productData['status'] ?? 'N/A'),
-                  _buildInfoCard('Category', productData['category'] ?? 'N/A'),
-                  _buildInfoCard(
-                    'Condition',
-                    productData['condition'] ?? 'N/A',
-                  ),
-                  _buildInfoCard(
-                    'Seller',
-                    productData['sellerName'] ?? 'Unknown',
-                  ),
+                // Key Product Information
+                _buildInfoCard(context, 'Status', productData['status'] ?? 'N/A'),
+                _buildInfoCard(context, 'Category', productData['category'] ?? 'N/A'),
+                _buildInfoCard(
+                  context,
+                  'Condition',
+                  productData['condition'] ?? 'N/A',
+                ),
+                _buildInfoCard(
+                  context,
+                  'Seller',
+                  productData['sellerName'] ?? 'Unknown',
+                  userId: sellerId,
+                ),
 
                   // Description Section
                   const SizedBox(height: 16),

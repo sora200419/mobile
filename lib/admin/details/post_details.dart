@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'comments_page.dart';
+import 'package:mobiletesting/admin/details/user_details.dart';
 
 class PostDetailsPage extends StatelessWidget {
   final String postId;
@@ -10,10 +11,11 @@ class PostDetailsPage extends StatelessWidget {
 
   Future<Map<String, dynamic>?> _fetchPostData() async {
     try {
-      DocumentSnapshot doc = await FirebaseFirestore.instance
-          .collection('community_posts')
-          .doc(postId)
-          .get();
+      DocumentSnapshot doc =
+          await FirebaseFirestore.instance
+              .collection('community_posts')
+              .doc(postId)
+              .get();
       return doc.data() as Map<String, dynamic>?;
     } catch (e) {
       print('Error fetching post: $e');
@@ -61,10 +63,7 @@ class PostDetailsPage extends StatelessWidget {
         return Dialog(
           child: GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.contain,
-            ),
+            child: Image.network(imageUrl, fit: BoxFit.contain),
           ),
         );
       },
@@ -75,12 +74,15 @@ class PostDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Post Details"),
+        title: const Text(
+          "Post Details",
+          style: TextStyle(color: Colors.white),
+        ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: Colors.teal, 
+        backgroundColor: Colors.teal,
         elevation: 2,
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
@@ -95,6 +97,7 @@ class PostDetailsPage extends StatelessWidget {
 
           var data = snapshot.data!;
           String userName = data['userName'] ?? 'Unknown';
+          String userId = data['userId'] ?? '';
           Timestamp createdAt = data['createdAt'] ?? Timestamp.now();
           String title = data['title'] ?? 'No Title';
           String content = data['content'] ?? 'No Content';
@@ -111,7 +114,7 @@ class PostDetailsPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Card(
-                elevation: 4, 
+                elevation: 4,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -124,25 +127,51 @@ class PostDetailsPage extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // user profile
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.3),
-                                  spreadRadius: 2,
-                                  blurRadius: 5,
-                                  offset: Offset(0, 2),
+                          // user profile with clickable avatar
+                          GestureDetector(
+                            onTap: () {
+                              if (userId.isNotEmpty) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => UserDetailPage(
+                                          userId: userId,
+                                        ),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('User ID not found'),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    spreadRadius: 2,
+                                    blurRadius: 5,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.teal[200],
+                                child: Text(
+                                  userName.isNotEmpty
+                                      ? userName[0].toUpperCase()
+                                      : 'U',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: Colors.teal[200],
-                              child: Text(
-                                userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                                style: TextStyle(fontSize: 24, color: Colors.white),
                               ),
                             ),
                           ),
@@ -180,7 +209,10 @@ class PostDetailsPage extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: IconButton(
-                                  icon: Icon(Icons.delete_forever, color: Colors.red),
+                                  icon: Icon(
+                                    Icons.delete_forever,
+                                    color: Colors.red,
+                                  ),
                                   onPressed: () => _confirmDelete(context),
                                 ),
                               ),
@@ -188,7 +220,10 @@ class PostDetailsPage extends StatelessWidget {
                               Text(
                                 'Reported\n$reportCount',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 12, color: Colors.red),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                ),
                               ),
                             ],
                           ),
@@ -219,16 +254,17 @@ class PostDetailsPage extends StatelessWidget {
                                 height: 200,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  height: 200,
-                                  width: double.infinity,
-                                  color: Colors.grey[200],
-                                  child: Icon(
-                                    Icons.image,
-                                    size: 100,
-                                    color: Colors.grey[400],
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stackTrace) => Container(
+                                      height: 200,
+                                      width: double.infinity,
+                                      color: Colors.grey[200],
+                                      child: Icon(
+                                        Icons.image,
+                                        size: 100,
+                                        color: Colors.grey[400],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -248,7 +284,7 @@ class PostDetailsPage extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.teal[800], // 使用主题色
+                                    color: Colors.teal[800],
                                   ),
                                 ),
                                 SizedBox(height: 8),
@@ -273,7 +309,9 @@ class PostDetailsPage extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => CommentsPage(postId: postId),
+                                    builder:
+                                        (context) =>
+                                            CommentsPage(postId: postId),
                                   ),
                                 );
                               },

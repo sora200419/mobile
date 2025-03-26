@@ -75,4 +75,8 @@ class AuthService {
       return e.toString(); // Error: return the exception
     }
   }
+
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
 }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:mobiletesting/admin/details/user_details.dart';
 
 class CommentsPage extends StatefulWidget {
   final String postId;
@@ -38,13 +39,13 @@ class _CommentsPageState extends State<CommentsPage> {
           .collection('community_posts')
           .doc(widget.postId)
           .update({'commentCount': FieldValue.increment(-1)});
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Comment deleted")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Comment deleted")),
+      );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to delete comment: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to delete comment: $e")),
+      );
     }
   }
 
@@ -96,6 +97,7 @@ class _CommentsPageState extends State<CommentsPage> {
               itemBuilder: (context, index) {
                 var data = docs[index].data() as Map<String, dynamic>;
                 String commentId = docs[index].id;
+                String userId = data['userId'] ?? '';
 
                 // initial expanded state
                 _expandedStates.putIfAbsent(commentId, () => false);
@@ -115,18 +117,38 @@ class _CommentsPageState extends State<CommentsPage> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // User avatar
-                      Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        child: CircleAvatar(
-                          backgroundColor: Colors.teal[100],
-                          child: Text(
-                            data['userName']?.isNotEmpty == true
-                                ? data['userName'][0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: Colors.teal[800],
-                              fontWeight: FontWeight.bold,
+                      // User avatar with clickable functionality
+                      GestureDetector(
+                        onTap: () {
+                          if (userId.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UserDetailPage(
+                                  userId: userId,
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('User ID not found'),
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          child: CircleAvatar(
+                            backgroundColor: Colors.teal[100],
+                            child: Text(
+                              data['userName']?.isNotEmpty == true
+                                  ? data['userName'][0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                color: Colors.teal[800],
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -169,10 +191,9 @@ class _CommentsPageState extends State<CommentsPage> {
                                 data['content'] ?? 'No Content',
                                 style: const TextStyle(fontSize: 15),
                                 maxLines: isExpanded ? null : 2,
-                                overflow:
-                                    isExpanded
-                                        ? TextOverflow.visible
-                                        : TextOverflow.ellipsis,
+                                overflow: isExpanded
+                                    ? TextOverflow.visible
+                                    : TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -187,29 +208,28 @@ class _CommentsPageState extends State<CommentsPage> {
                         onPressed: () {
                           showDialog(
                             context: context,
-                            builder:
-                                (context) => AlertDialog(
-                                  title: const Text("Delete Comment"),
-                                  content: const Text(
-                                    "This action cannot be undone. Delete this comment?",
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text("Cancel"),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        _deleteComment(commentId, context);
-                                      },
-                                      child: const Text(
-                                        "Delete",
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
+                            builder: (context) => AlertDialog(
+                              title: const Text("Delete Comment"),
+                              content: const Text(
+                                "This action cannot be undone. Delete this comment?",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text("Cancel"),
                                 ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _deleteComment(commentId, context);
+                                  },
+                                  child: const Text(
+                                    "Delete",
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
