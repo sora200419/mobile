@@ -8,6 +8,10 @@ import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class PostCard extends StatefulWidget {
   final CommunityPost post;
@@ -24,19 +28,137 @@ class _PostCardState extends State<PostCard> {
   final CommunityService _communityService = CommunityService();
   final CloudinaryService _cloudinaryService = CloudinaryService();
   bool _isLiked = false;
+  bool _isBookmarked = false;
+  bool _isShareLoading = false;
+  bool _isBookmarkLoading = false;
 
   @override
   void initState() {
     super.initState();
     _checkIfLiked();
+    _checkIfBookmarked();
   }
 
   Future<void> _checkIfLiked() async {
-    final liked = await _communityService.hasUserLikedPost(widget.post.id!);
-    if (mounted) {
-      setState(() {
-        _isLiked = liked;
-      });
+    if (widget.post.id != null) {
+      final liked = await _communityService.hasUserLikedPost(widget.post.id!);
+      if (mounted) {
+        setState(() {
+          _isLiked = liked;
+        });
+      }
+    }
+  }
+
+  Future<void> _checkIfBookmarked() async {
+    if (widget.post.id != null) {
+      final bookmarked = await _communityService.isPostBookmarked(
+        widget.post.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = bookmarked;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarkLoading || widget.post.id == null) return;
+
+    setState(() {
+      _isBookmarkLoading = true;
+    });
+
+    try {
+      final isBookmarked = await _communityService.toggleBookmark(
+        widget.post.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = isBookmarked;
+          _isBookmarkLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isBookmarked ? 'Post saved' : 'Post removed from saved',
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling bookmark: $e');
+      if (mounted) {
+        setState(() {
+          _isBookmarkLoading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving post: $e')));
+      }
+    }
+  }
+
+  Future<void> _sharePost() async {
+    if (_isShareLoading) return;
+
+    setState(() {
+      _isShareLoading = true;
+    });
+
+    try {
+      // Get post content
+      final String postText =
+          '${widget.post.title}\n\n${widget.post.content}\n\nShared from CampusLink';
+
+      // Check if post has images
+      if (widget.post.imageUrls.isNotEmpty) {
+        try {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Preparing content to share...')),
+          );
+
+          // Download the first image to a temporary file
+          final http.Response response = await http.get(
+            Uri.parse(widget.post.imageUrls.first),
+          );
+          final Directory tempDir = await getTemporaryDirectory();
+          final String filePath = '${tempDir.path}/shared_image.jpg';
+          final File file = File(filePath);
+          await file.writeAsBytes(response.bodyBytes);
+
+          // Share text and image
+          await Share.shareXFiles(
+            [XFile(filePath)],
+            text: postText,
+            subject: widget.post.title,
+          );
+        } catch (e) {
+          debugPrint('Error sharing with image, falling back to text: $e');
+          // If image sharing fails, fall back to text-only sharing
+          await Share.share(postText, subject: widget.post.title);
+        }
+      } else {
+        // Share only text
+        await Share.share(postText, subject: widget.post.title);
+      }
+    } catch (e) {
+      debugPrint('Error sharing post: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sharing post: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isShareLoading = false;
+        });
+      }
     }
   }
 
@@ -372,15 +494,44 @@ class _PostCardState extends State<PostCard> {
             '${widget.post.commentCount}',
             style: TextStyle(color: Colors.grey.shade700),
           ),
-          const Spacer(),
+
+          // New bookmark button
           IconButton(
-            onPressed: () {
-              // Share functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon!')),
-              );
-            },
-            icon: const Icon(Icons.share_outlined),
+            onPressed: _toggleBookmark,
+            icon:
+                _isBookmarkLoading
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.deepPurple,
+                        ),
+                      ),
+                    )
+                    : Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: _isBookmarked ? Colors.deepPurple : null,
+                    ),
+          ),
+
+          const Spacer(),
+
+          // Share button
+          IconButton(
+            onPressed: _isShareLoading ? null : _sharePost,
+            icon:
+                _isShareLoading
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                      ),
+                    )
+                    : const Icon(Icons.share_outlined),
           ),
         ],
       ),

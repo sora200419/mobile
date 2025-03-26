@@ -3,7 +3,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/community/models/community_post.dart';
 import 'package:mobiletesting/features/community/models/comment.dart';
@@ -12,7 +11,6 @@ import 'package:mobiletesting/features/marketplace/services/cloudinary_service.d
 
 class CommunityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GamificationService _gamificationService = GamificationService();
   final CloudinaryService _cloudinaryService = CloudinaryService();
@@ -297,6 +295,85 @@ class CommunityService {
           (snapshot) =>
               snapshot.docs.map((doc) => Comment.fromDocument(doc)).toList(),
         );
+  }
+
+  // Get user's bookmarked posts
+  Stream<List<CommunityPost>> getBookmarkedPosts(String userId) {
+    return _firestore
+        .collection('bookmarks')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<CommunityPost> posts = [];
+
+          for (var doc in snapshot.docs) {
+            final bookmarkData = doc.data();
+            final postId = bookmarkData['postId'];
+
+            // Get post document for each bookmark
+            try {
+              final postDoc = await _postsCollection.doc(postId).get();
+              if (postDoc.exists) {
+                posts.add(CommunityPost.fromDocument(postDoc));
+              }
+            } catch (e) {
+              debugPrint('Error getting bookmarked post: $e');
+            }
+          }
+
+          return posts;
+        });
+  }
+
+  // Check if a post is bookmarked by the user
+  Future<bool> isPostBookmarked(String postId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return false;
+
+    final snapshot =
+        await _firestore
+            .collection('bookmarks')
+            .where('userId', isEqualTo: userId)
+            .where('postId', isEqualTo: postId)
+            .limit(1)
+            .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  // Toggle bookmark status
+  Future<bool> toggleBookmark(String postId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    // Check if already bookmarked
+    final snapshot =
+        await _firestore
+            .collection('bookmarks')
+            .where('userId', isEqualTo: userId)
+            .where('postId', isEqualTo: postId)
+            .limit(1)
+            .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      // Remove bookmark
+      await _firestore
+          .collection('bookmarks')
+          .doc(snapshot.docs.first.id)
+          .delete();
+      return false; // Not bookmarked anymore
+    } else {
+      // Add bookmark
+      final bookmark = {
+        'userId': userId,
+        'postId': postId,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('bookmarks').add(bookmark);
+      return true; // Now bookmarked
+    }
   }
 
   // Add a comment to a post
