@@ -90,23 +90,10 @@ class _ProfileTabState extends State<ProfileTab> {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildStatCard(
-                      icon: Icons.check_circle,
-                      color: Colors.green,
-                      title: 'Tasks Completed',
-                      statFuture: _getCompletedTasksCount(userId),
-                    ),
-                    _buildStatCard(
                       icon: Icons.local_fire_department,
                       color: Colors.orange,
                       title: 'Login Streak',
                       statFuture: _getCurrentLoginStreak(userId),
-                    ),
-                    _buildStatCard(
-                      icon: Icons.star,
-                      color: Colors.amber,
-                      title: 'Rating',
-                      statFuture: _getAverageRating(userId),
-                      isRating: true,
                     ),
                     _buildStatCard(
                       icon: Icons.emoji_events,
@@ -661,28 +648,6 @@ class _ProfileTabState extends State<ProfileTab> {
     } catch (e) {
       print('Error getting login streak: $e');
       return '0';
-    }
-  }
-
-  Future<String> _getAverageRating(String userId) async {
-    try {
-      DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .get();
-
-      if (!userDoc.exists) {
-        return '0.0';
-      }
-
-      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-      double averageRating = (userData['averageRating'] ?? 0.0).toDouble();
-
-      return averageRating.toStringAsFixed(1);
-    } catch (e) {
-      print('Error getting average rating: $e');
-      return '0.0';
     }
   }
 
