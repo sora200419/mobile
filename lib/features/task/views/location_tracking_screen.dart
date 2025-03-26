@@ -1,3 +1,5 @@
+// lib/features/task/views/location_tracking_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -5,6 +7,8 @@ import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/location_service.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:math' as math;
+
+import 'package:mobiletesting/features/task/utility/location_tracking_tester.dart';
 
 class LocationTrackingScreen extends StatefulWidget {
   final Task task;
@@ -36,29 +40,43 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
   }
 
   Future<void> _initializeTracking() async {
-    // Try to get the task's location coordinates
-    await _getTaskLocation();
+    try {
+      // Try to get the task's location coordinates
+      debugPrint('Step 1: Getting task location for ${widget.task.location}');
+      await _getTaskLocation();
 
-    // Check if tracking is active
-    _checkTrackingStatus();
+      // Check if tracking is active
+      debugPrint('Step 2: Checking tracking status for task ${widget.task.id}');
+      await _checkTrackingStatus();
 
-    // Check for initial runner position
-    await _checkInitialRunnerPosition();
+      // Check for initial runner position
+      debugPrint('Step 3: Checking initial runner position');
+      await _checkInitialRunnerPosition();
+    } catch (e) {
+      debugPrint('Error during tracking initialization: $e');
+      setState(() {
+        _isLoading = false;
+        _statusMessage = 'Error initializing tracking: $e';
+      });
+    }
   }
 
   Future<void> _getTaskLocation() async {
     try {
       if (widget.task.latLng != null) {
+        debugPrint('Task already has LatLng: ${widget.task.latLng}');
         setState(() {
           _taskLocation = widget.task.latLng;
           _updateTaskMarker();
         });
       } else {
         // Try to geocode the location string
+        debugPrint('Attempting to geocode: ${widget.task.location}');
         try {
           List<Location> locations = await locationFromAddress(
             widget.task.location,
           );
+          debugPrint('Geocoding results: ${locations.length} locations found');
           if (locations.isNotEmpty) {
             setState(() {
               _taskLocation = LatLng(
@@ -67,13 +85,25 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
               );
               _updateTaskMarker();
             });
+            debugPrint('Successfully geocoded to: $_taskLocation');
+          } else {
+            debugPrint(
+              'Unable to find coordinates for address: ${widget.task.location}',
+            );
+            setState(() {
+              _statusMessage = 'Could not find location on map';
+            });
           }
         } catch (e) {
-          print('Error geocoding task location: $e');
+          debugPrint('Geocoding error: $e');
+          setState(() {
+            _statusMessage = 'Error finding location: $e';
+          });
         }
       }
     } catch (e) {
-      print('Error getting task location: $e');
+      debugPrint('Error getting task location: $e');
+      throw e; // Rethrow to be caught by the caller
     }
   }
 
@@ -97,28 +127,45 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
     }
   }
 
-  void _checkTrackingStatus() async {
+  Future<void> _checkTrackingStatus() async {
     if (widget.task.id != null) {
+      debugPrint('Checking if tracking is active for task: ${widget.task.id}');
       bool isActive = await RunnerLocationService.isTrackingActive(
         widget.task.id!,
       );
+      debugPrint('Is tracking active: $isActive');
       setState(() {
         _isTrackingActive = isActive;
         if (!isActive) {
           _statusMessage = 'Runner has not started sharing location yet';
+        } else {
+          _statusMessage = 'Runner is sharing location';
         }
       });
+    } else {
+      debugPrint('Task ID is null, cannot check tracking status');
     }
   }
 
   Future<void> _checkInitialRunnerPosition() async {
     try {
+      if (widget.task.id == null) {
+        debugPrint('Task ID is null, cannot check runner position');
+        setState(() {
+          _isLoading = false;
+          _statusMessage = 'Cannot track: Missing task ID';
+        });
+        return;
+      }
+
+      debugPrint('Fetching initial runner position from Firebase');
       DatabaseEvent event =
           await FirebaseDatabase.instance
               .ref('taskLocations/${widget.task.id}')
               .once();
 
       if (event.snapshot.value != null) {
+        debugPrint('Initial runner position data: ${event.snapshot.value}');
         Map<dynamic, dynamic> locationData =
             event.snapshot.value as Map<dynamic, dynamic>;
         setState(() {
@@ -128,14 +175,21 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
           );
           _updateRunnerMarker();
           _isLoading = false;
+          _statusMessage = 'Runner location found';
         });
       } else {
+        debugPrint('No initial runner position data available');
         setState(() {
           _isLoading = false;
-          _statusMessage = 'Runner has not started sharing location yet';
+          if (_isTrackingActive) {
+            _statusMessage = 'Waiting for runner location updates...';
+          } else {
+            _statusMessage = 'Runner has not started sharing location yet';
+          }
         });
       }
     } catch (e) {
+      debugPrint('Error checking initial runner position: $e');
       setState(() {
         _isLoading = false;
         _statusMessage = 'Error loading runner location: $e';
@@ -171,25 +225,7 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Tracking: ${widget.task.title}'),
-        actions: [
-          // For runners: toggle location sharing
-          if (!widget.isStudent &&
-              widget.task.id != null &&
-              widget.task.providerId != null)
-            IconButton(
-              icon: Icon(
-                _isTrackingActive ? Icons.location_off : Icons.location_on,
-              ),
-              tooltip:
-                  _isTrackingActive
-                      ? 'Stop sharing location'
-                      : 'Start sharing location',
-              onPressed: () => _toggleLocationSharing(context),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text('Tracking: ${widget.task.title}')),
       body: Column(
         children: [
           // Task info card
@@ -224,6 +260,48 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
             ),
           ),
 
+          // Tracking status indicator
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color:
+                  _isTrackingActive
+                      ? Colors.green.shade50
+                      : Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color:
+                    _isTrackingActive
+                        ? Colors.green.shade200
+                        : Colors.amber.shade200,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isTrackingActive ? Icons.location_on : Icons.location_off,
+                  color: _isTrackingActive ? Colors.green : Colors.amber,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isTrackingActive
+                      ? 'Runner is sharing location'
+                      : 'Waiting for runner to share location',
+                  style: TextStyle(
+                    color:
+                        _isTrackingActive
+                            ? Colors.green.shade700
+                            : Colors.amber.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Map view
           Expanded(
             child:
@@ -242,6 +320,23 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
           ),
         ],
       ),
+      // Student debugging feature - usually hidden in production
+      floatingActionButton:
+          widget.isStudent
+              ? FloatingActionButton(
+                onPressed: () {
+                  if (widget.task.id != null) {
+                    LocationTrackingTester.addManualLocation(
+                      context,
+                      widget.task.id!,
+                    );
+                  }
+                },
+                child: const Icon(Icons.science),
+                backgroundColor: Colors.deepPurple,
+                tooltip: 'Add Test Location',
+              )
+              : null,
     );
   }
 
@@ -255,15 +350,37 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
             const Icon(Icons.location_off, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
             Text(_statusMessage, textAlign: TextAlign.center),
-            if (!widget.isStudent && widget.task.status == 'in_transit')
-              Padding(
-                padding: const EdgeInsets.only(top: 24.0),
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.location_on),
-                  label: const Text('Start Sharing Location'),
-                  onPressed: () => _toggleLocationSharing(context),
-                ),
+            const SizedBox(height: 24),
+
+            // Debug info - this helps during testing
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
               ),
+              child: Column(
+                children: [
+                  Text(
+                    'Debug Information',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Task ID: ${widget.task.id ?? "null"}\n'
+                    'Runner ID: ${widget.task.providerId ?? "null"}\n'
+                    'Status: ${widget.task.status}\n'
+                    'Is Student View: ${widget.isStudent}',
+                    style: TextStyle(fontSize: 12, color: Colors.blue.shade800),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -280,6 +397,7 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
           builder: (context, snapshot) {
             // Handle stream data updates
             if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
+              debugPrint('Received new location update');
               Map<dynamic, dynamic> locationData =
                   snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
 
@@ -297,6 +415,8 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
                 _runnerPosition = newPosition;
                 _updateRunnerMarker();
               }
+            } else if (snapshot.hasError) {
+              debugPrint('Error in location stream: ${snapshot.error}');
             }
 
             // Initial map view
@@ -315,6 +435,7 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
               myLocationEnabled: true,
               myLocationButtonEnabled: true,
               compassEnabled: true,
+              zoomControlsEnabled: true,
               onMapCreated: (controller) {
                 _mapController = controller;
               },
@@ -476,45 +597,6 @@ class _LocationTrackingScreenState extends State<LocationTrackingScreen> {
     int hours = (minutes / 60).floor();
     int mins = (minutes % 60).round();
     return '$hours h${mins > 0 ? ' $mins mins' : ''}';
-  }
-
-  // Toggle location sharing for runners
-  Future<void> _toggleLocationSharing(BuildContext context) async {
-    if (widget.task.id == null || widget.task.providerId == null) return;
-
-    try {
-      final locationService = RunnerLocationService(widget.task.providerId!);
-
-      if (_isTrackingActive) {
-        // Stop sharing location
-        await locationService.stopSharingLocation(widget.task.id!);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location sharing stopped')),
-        );
-      } else {
-        // Start sharing location
-        bool success = await locationService.startSharingLocation(
-          widget.task.id!,
-          context,
-        );
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location sharing started')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to start location sharing')),
-          );
-        }
-      }
-
-      // Refresh tracking status
-      _checkTrackingStatus();
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
   }
 
   @override
