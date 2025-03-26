@@ -216,7 +216,7 @@ class _PostsTabState extends State<PostsTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // search bas
+        // search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: TextField(
