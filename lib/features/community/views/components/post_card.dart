@@ -7,6 +7,8 @@ import 'package:mobiletesting/features/community/services/community_service.dart
 import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:mobiletesting/features/community/services/post_share_service.dart';
 
 class PostCard extends StatefulWidget {
   final CommunityPost post;
@@ -21,20 +23,105 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   final CommunityService _communityService = CommunityService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
+  final PostShareService _postShareService = PostShareService();
   bool _isLiked = false;
+  bool _isBookmarked = false;
+  bool _isShareLoading = false;
+  bool _isBookmarkLoading = false;
 
   @override
   void initState() {
     super.initState();
     _checkIfLiked();
+    _checkIfBookmarked();
   }
 
   Future<void> _checkIfLiked() async {
-    final liked = await _communityService.hasUserLikedPost(widget.post.id!);
-    if (mounted) {
-      setState(() {
-        _isLiked = liked;
-      });
+    if (widget.post.id != null) {
+      final liked = await _communityService.hasUserLikedPost(widget.post.id!);
+      if (mounted) {
+        setState(() {
+          _isLiked = liked;
+        });
+      }
+    }
+  }
+
+  Future<void> _checkIfBookmarked() async {
+    if (widget.post.id != null) {
+      final bookmarked = await _communityService.isPostBookmarked(
+        widget.post.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = bookmarked;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarkLoading || widget.post.id == null) return;
+
+    setState(() {
+      _isBookmarkLoading = true;
+    });
+
+    try {
+      final isBookmarked = await _communityService.toggleBookmark(
+        widget.post.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = isBookmarked;
+          _isBookmarkLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isBookmarked ? 'Post saved' : 'Post removed from saved',
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling bookmark: $e');
+      if (mounted) {
+        setState(() {
+          _isBookmarkLoading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving post: $e')));
+      }
+    }
+  }
+
+  Future<void> _sharePost() async {
+    if (_isShareLoading || widget.post.id == null) return;
+
+    setState(() {
+      _isShareLoading = true;
+    });
+
+    try {
+      await _postShareService.sharePost(context, widget.post);
+    } catch (e) {
+      debugPrint('Error sharing post: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sharing post: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isShareLoading = false;
+        });
+      }
     }
   }
 
@@ -173,15 +260,31 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildImages() {
-    if (widget.post.imageUrls.isEmpty) return const SizedBox.shrink();
+    if (widget.post.imageUrls.isEmpty) {
+      debugPrint('No images to display for post ${widget.post.id}');
+      return const SizedBox.shrink();
+    }
+
+    debugPrint(
+      'Building images for post ${widget.post.id}: ${widget.post.imageUrls}',
+    );
 
     if (widget.post.imageUrls.length == 1) {
+      final optimizedUrl = _cloudinaryService.getOptimizedImageUrl(
+        widget.post.imageUrls.first,
+        width: 800,
+        height: 400,
+        quality: 85,
+      );
+
+      debugPrint('Optimized URL for display: $optimizedUrl');
+
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: CachedNetworkImage(
-            imageUrl: widget.post.imageUrls.first,
+            imageUrl: optimizedUrl,
             height: 200,
             width: double.infinity,
             fit: BoxFit.cover,
@@ -195,7 +298,24 @@ class _PostCardState extends State<PostCard> {
                 (context, url, error) => Container(
                   height: 200,
                   color: Colors.grey.shade200,
-                  child: const Icon(Icons.error),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, size: 32, color: Colors.grey),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      Text(
+                        'Error: $error',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
           ),
         ),
@@ -222,7 +342,12 @@ class _PostCardState extends State<PostCard> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: CachedNetworkImage(
-                        imageUrl: widget.post.imageUrls[index],
+                        imageUrl: _cloudinaryService.getOptimizedImageUrl(
+                          widget.post.imageUrls[index],
+                          width: 200,
+                          height: 200,
+                          quality: 75,
+                        ),
                         height: 100,
                         width: 100,
                         fit: BoxFit.cover,
@@ -254,7 +379,12 @@ class _PostCardState extends State<PostCard> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
-                    imageUrl: widget.post.imageUrls[index],
+                    imageUrl: _cloudinaryService.getOptimizedImageUrl(
+                      widget.post.imageUrls[index],
+                      width: 200,
+                      height: 200,
+                      quality: 75,
+                    ),
                     height: 100,
                     width: 100,
                     fit: BoxFit.cover,
@@ -327,15 +457,44 @@ class _PostCardState extends State<PostCard> {
             '${widget.post.commentCount}',
             style: TextStyle(color: Colors.grey.shade700),
           ),
-          const Spacer(),
+
+          // New bookmark button
           IconButton(
-            onPressed: () {
-              // Share functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon!')),
-              );
-            },
-            icon: const Icon(Icons.share_outlined),
+            onPressed: _toggleBookmark,
+            icon:
+                _isBookmarkLoading
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.deepPurple,
+                        ),
+                      ),
+                    )
+                    : Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: _isBookmarked ? Colors.deepPurple : null,
+                    ),
+          ),
+
+          const Spacer(),
+
+          // Share button
+          IconButton(
+            onPressed: _isShareLoading ? null : _sharePost,
+            icon:
+                _isShareLoading
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                      ),
+                    )
+                    : const Icon(Icons.share_outlined),
           ),
         ],
       ),

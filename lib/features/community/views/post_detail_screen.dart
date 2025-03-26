@@ -1,5 +1,6 @@
 // lib/features/community/views/post_detail_screen.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/community/models/community_post.dart';
 import 'package:mobiletesting/features/community/services/community_service.dart';
@@ -9,6 +10,10 @@ import 'package:mobiletesting/features/community/views/components/comment_sectio
 import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final CommunityPost post;
@@ -21,12 +26,32 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final CommunityService _communityService = CommunityService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   late Stream<CommunityPost?> _postStream;
+  bool _isBookmarked = false;
+  bool _isShareLoading = false;
+  bool _isBookmarkLoading = false;
 
   @override
   void initState() {
     super.initState();
     _postStream = _communityService.getPost(widget.post.id!);
+    _checkIfBookmarked();
+  }
+
+  Future<void> _checkIfBookmarked() async {
+    try {
+      final isBookmarked = await _communityService.isPostBookmarked(
+        widget.post.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = isBookmarked;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking bookmark status: $e');
+    }
   }
 
   Future<void> _deletePost() async {
@@ -73,11 +98,104 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  void _sharePost() {
-    final String postContent =
-        '${widget.post.title}\n\n${widget.post.content}\n\nShared from CampusLink';
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarkLoading) return;
 
-    Share.share(postContent);
+    setState(() {
+      _isBookmarkLoading = true;
+    });
+
+    try {
+      final isBookmarked = await _communityService.toggleBookmark(
+        widget.post.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = isBookmarked;
+          _isBookmarkLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isBookmarked
+                  ? 'Post saved to bookmarks'
+                  : 'Post removed from bookmarks',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling bookmark: $e');
+      if (mounted) {
+        setState(() {
+          _isBookmarkLoading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving post: $e')));
+      }
+    }
+  }
+
+  Future<void> _sharePost() async {
+    if (_isShareLoading) return;
+
+    setState(() {
+      _isShareLoading = true;
+    });
+
+    try {
+      // Get post content
+      final String postText =
+          '${widget.post.title}\n\n${widget.post.content}\n\nShared from CampusLink';
+
+      // Check if post has images
+      if (widget.post.imageUrls.isNotEmpty) {
+        try {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Preparing content to share...')),
+          );
+
+          // Download the first image to a temporary file
+          final http.Response response = await http.get(
+            Uri.parse(widget.post.imageUrls.first),
+          );
+          final Directory tempDir = await getTemporaryDirectory();
+          final String filePath = '${tempDir.path}/shared_image.jpg';
+          final File file = File(filePath);
+          await file.writeAsBytes(response.bodyBytes);
+
+          // Share text and image
+          await Share.shareXFiles(
+            [XFile(filePath)],
+            text: postText,
+            subject: widget.post.title,
+          );
+        } catch (e) {
+          debugPrint('Error sharing with image, falling back to text: $e');
+          // If image sharing fails, fall back to text-only sharing
+          await Share.share(postText, subject: widget.post.title);
+        }
+      } else {
+        // Share only text
+        await Share.share(postText, subject: widget.post.title);
+      }
+    } catch (e) {
+      debugPrint('Error sharing post: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sharing post: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isShareLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _reportPost() async {
@@ -307,6 +425,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             );
           }
 
+          // Log image URLs for debugging
+          debugPrint(
+            'Rendering post with ${post.imageUrls.length} images: ${post.imageUrls}',
+          );
+
           // Use CustomScrollView for better control of the scrolling behavior
           return CustomScrollView(
             slivers: [
@@ -319,6 +442,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       if (post.type != PostType.general &&
                           post.metadata != null)
                         _buildMetadataSection(post),
+                      _buildImagesSection(post),
                       CommentSection(postId: post.id!),
                       // Add extra padding to avoid bottom bar overlap
                       SizedBox(
@@ -352,18 +476,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 _buildActionButton(
                   icon: Icons.share,
                   label: 'Share',
+                  isLoading: _isShareLoading,
                   onPressed: _sharePost,
                 ),
                 _buildActionButton(
-                  icon: Icons.bookmark_border,
+                  icon: _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                   label: 'Save',
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Bookmark feature coming soon!'),
-                      ),
-                    );
-                  },
+                  isLoading: _isBookmarkLoading,
+                  onPressed: _toggleBookmark,
                 ),
                 _buildActionButton(
                   icon: Icons.report_outlined,
@@ -382,6 +502,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
+    bool isLoading = false,
   }) {
     return InkWell(
       onTap: onPressed,
@@ -391,11 +512,93 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.deepPurple),
+            isLoading
+                ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.deepPurple,
+                    ),
+                  ),
+                )
+                : Icon(icon, color: Colors.deepPurple),
             const SizedBox(height: 4),
             Text(label, style: TextStyle(color: Colors.deepPurple.shade800)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildImagesSection(CommunityPost post) {
+    if (post.imageUrls.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Images',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: post.imageUrls.length,
+            itemBuilder: (context, index) {
+              final optimizedUrl = _cloudinaryService.getOptimizedImageUrl(
+                post.imageUrls[index],
+                width: 800,
+                height: 600,
+                quality: 85,
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: optimizedUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder:
+                        (context, url) => Container(
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                    errorWidget:
+                        (context, url, error) => Container(
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error,
+                                size: 32,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Image not available',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

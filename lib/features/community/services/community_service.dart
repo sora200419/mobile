@@ -3,17 +3,17 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/community/models/community_post.dart';
 import 'package:mobiletesting/features/community/models/comment.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
 
 class CommunityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GamificationService _gamificationService = GamificationService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
   // Collection references
   CollectionReference get _postsCollection =>
@@ -77,10 +77,19 @@ class CommunityService {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       final userName = userDoc['name'] ?? 'Anonymous';
 
-      // Upload images if any
+      // Upload images if any, with error handling
       List<String> imageUrls = [];
       if (images.isNotEmpty) {
-        imageUrls = await _uploadImages(images);
+        try {
+          debugPrint('Uploading ${images.length} images to Cloudinary');
+          imageUrls = await _uploadImages(images);
+          debugPrint(
+            'Successfully uploaded ${imageUrls.length} images: $imageUrls',
+          );
+        } catch (e) {
+          debugPrint('Warning: Failed to upload images: $e');
+          // Continue without images rather than failing the entire post creation
+        }
       }
 
       // Create post
@@ -98,6 +107,13 @@ class CommunityService {
 
       // Save post to Firestore
       final docRef = await _postsCollection.add(post.toMap());
+
+      // Verify the post was saved with images
+      final savedDoc = await _postsCollection.doc(docRef.id).get();
+      final savedPost = CommunityPost.fromDocument(savedDoc);
+      debugPrint(
+        'Saved post with ${savedPost.imageUrls.length} images: ${savedPost.imageUrls}',
+      );
 
       // Award points for creating a post
       await _gamificationService.awardPoints(
@@ -120,22 +136,31 @@ class CommunityService {
 
       return docRef.id;
     } catch (e) {
+      debugPrint('Error in createPost: $e');
       throw Exception('Failed to create post: $e');
     }
   }
 
-  // Upload multiple images to Firebase Storage
+  // Upload multiple images using Cloudinary
   Future<List<String>> _uploadImages(List<File> images) async {
     List<String> urls = [];
 
     for (var image in images) {
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${image.path.split('/').last}';
-      final ref = _storage.ref().child('community_images/$fileName');
+      try {
+        debugPrint('Uploading image to Cloudinary: ${image.path}');
 
-      await ref.putFile(image);
-      final url = await ref.getDownloadURL();
-      urls.add(url);
+        // Use CloudinaryService instead of Firebase Storage
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          folder: 'community_posts', // Use a dedicated folder for community
+        );
+
+        urls.add(imageUrl);
+        debugPrint('Successfully uploaded image to Cloudinary: $imageUrl');
+      } catch (e) {
+        debugPrint('Error uploading image to Cloudinary: $e');
+        // Continue with other images rather than failing completely
+      }
     }
 
     return urls;
@@ -165,8 +190,13 @@ class CommunityService {
       List<String> updatedImageUrls = imagesToKeep ?? [];
 
       if (newImages != null && newImages.isNotEmpty) {
-        final newUrls = await _uploadImages(newImages);
-        updatedImageUrls.addAll(newUrls);
+        try {
+          final newUrls = await _uploadImages(newImages);
+          updatedImageUrls.addAll(newUrls);
+        } catch (e) {
+          debugPrint('Warning: Failed to upload new images: $e');
+          // Continue with the update using existing images
+        }
       }
 
       // Update the post
@@ -197,15 +227,8 @@ class CommunityService {
         throw Exception('You do not have permission to delete this post');
       }
 
-      // Delete images from storage
-      for (var imageUrl in post.imageUrls) {
-        try {
-          await _storage.refFromURL(imageUrl).delete();
-        } catch (e) {
-          // Continue even if image deletion fails
-          debugPrint('Failed to delete image: $e');
-        }
-      }
+      // We don't need to delete Cloudinary images as they can be managed through the Cloudinary dashboard
+      // or can be cleaned up using a serverless function if needed
 
       // Delete comments subcollection
       final commentsSnapshot = await _commentsCollection(postId).get();
@@ -272,6 +295,85 @@ class CommunityService {
           (snapshot) =>
               snapshot.docs.map((doc) => Comment.fromDocument(doc)).toList(),
         );
+  }
+
+  // Get user's bookmarked posts
+  Stream<List<CommunityPost>> getBookmarkedPosts(String userId) {
+    return _firestore
+        .collection('bookmarks')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<CommunityPost> posts = [];
+
+          for (var doc in snapshot.docs) {
+            final bookmarkData = doc.data();
+            final postId = bookmarkData['postId'];
+
+            // Get post document for each bookmark
+            try {
+              final postDoc = await _postsCollection.doc(postId).get();
+              if (postDoc.exists) {
+                posts.add(CommunityPost.fromDocument(postDoc));
+              }
+            } catch (e) {
+              debugPrint('Error getting bookmarked post: $e');
+            }
+          }
+
+          return posts;
+        });
+  }
+
+  // Check if a post is bookmarked by the user
+  Future<bool> isPostBookmarked(String postId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return false;
+
+    final snapshot =
+        await _firestore
+            .collection('bookmarks')
+            .where('userId', isEqualTo: userId)
+            .where('postId', isEqualTo: postId)
+            .limit(1)
+            .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  // Toggle bookmark status
+  Future<bool> toggleBookmark(String postId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    // Check if already bookmarked
+    final snapshot =
+        await _firestore
+            .collection('bookmarks')
+            .where('userId', isEqualTo: userId)
+            .where('postId', isEqualTo: postId)
+            .limit(1)
+            .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      // Remove bookmark
+      await _firestore
+          .collection('bookmarks')
+          .doc(snapshot.docs.first.id)
+          .delete();
+      return false; // Not bookmarked anymore
+    } else {
+      // Add bookmark
+      final bookmark = {
+        'userId': userId,
+        'postId': postId,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('bookmarks').add(bookmark);
+      return true; // Now bookmarked
+    }
   }
 
   // Add a comment to a post

@@ -1,5 +1,3 @@
-// lib/features/task/views/task_detail_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +6,8 @@ import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/views/location_tacking_screen.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
+import 'package:mobiletesting/features/task/views/task_rating_screen.dart';
+import 'package:mobiletesting/features/task/services/rating_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
@@ -27,6 +27,7 @@ class TaskDetailScreen extends StatefulWidget {
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final TaskService _taskService = TaskService();
+  final RatingService _ratingService = RatingService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Controllers for creating a new task
@@ -40,6 +41,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   bool _isLoading = false;
   bool _isLocationTrackingActive = false;
+  bool _hasUserRatedTask = false;
 
   // List of task categories
   final List<String> _categories = [
@@ -80,9 +82,30 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       if (widget.task!.status == 'in_transit') {
         _checkLocationTrackingStatus();
       }
+
+      // Check if user has already rated this task
+      if (widget.task!.status == 'completed' && widget.task!.id != null) {
+        _checkIfUserRatedTask();
+      }
     } else {
       // For new tasks, calculate initial points
       _calculateRewardPoints();
+    }
+  }
+
+  Future<void> _checkIfUserRatedTask() async {
+    if (widget.task == null || widget.task!.id == null) return;
+
+    try {
+      bool hasRated = await _ratingService.hasUserRatedTask(widget.task!.id!);
+
+      if (mounted) {
+        setState(() {
+          _hasUserRatedTask = hasRated;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking if user has rated task: $e');
     }
   }
 
@@ -316,6 +339,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  // Navigate to rating screen
+  void _navigateToRatingScreen(String userIdToRate, String userNameToRate) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => TaskRatingScreen(
+              task: widget.task!,
+              userIdToRate: userIdToRate,
+              userNameToRate: userNameToRate,
+            ),
+      ),
+    ).then((rated) {
+      if (rated == true) {
+        // Update the state to reflect that user has now rated
+        setState(() {
+          _hasUserRatedTask = true;
+        });
+      }
+    });
   }
 
   // Cancel a task
@@ -552,6 +597,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             task.status == 'in_transit') &&
         (isRequester || isProvider);
 
+    // Rating button logic - can rate only if the task is completed
+    final bool isCompleted = task.status == 'completed';
+    final bool canRate = isCompleted && !_hasUserRatedTask;
+
+    // Define who to rate based on user role
+    String? userIdToRate;
+    String? userNameToRate;
+
+    if (isRequester && task.providerId != null) {
+      // Requester rates the provider
+      userIdToRate = task.providerId!;
+      userNameToRate = task.providerName ?? 'Runner';
+    } else if (isProvider) {
+      // Provider rates the requester
+      userIdToRate = task.requesterId;
+      userNameToRate = task.requesterName;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -729,6 +792,30 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
 
+          // Status explanation for completed tasks
+          if (task.status == 'completed')
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This task has been completed successfully!',
+                      style: TextStyle(color: Colors.green.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Live location tracking (only for in_transit tasks)
           if (task.status == 'in_transit' && task.id != null)
             Column(
@@ -759,7 +846,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ],
             ),
 
-          // Action buttons
+          // Action buttons row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -798,6 +885,49 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
             ],
           ),
+
+          const SizedBox(height: 24),
+
+          // Rating button (only for completed tasks)
+          if (canRate && userIdToRate != null && userNameToRate != null)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed:
+                    () =>
+                        _navigateToRatingScreen(userIdToRate!, userNameToRate!),
+                icon: const Icon(Icons.star),
+                label: Text('Rate ${isRequester ? "Runner" : "Requester"}'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+
+          // Rating completed message
+          if (isCompleted && _hasUserRatedTask)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(top: 16),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You have already rated this task. Thank you for your feedback!',
+                      style: TextStyle(color: Colors.amber.shade800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           const SizedBox(height: 16),
 

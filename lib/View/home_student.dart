@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 
 // Import the tab widgets
 import 'package:mobiletesting/tabs/tasks_tab.dart';
@@ -97,29 +98,19 @@ class _HomeStudentState extends State<HomeStudent> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () {
-                  // Menu functionality
-                },
+              Text(
+                "Hi $username,",
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Hi $username,",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Text(
-                    "let's start exploring.",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
+              const Text(
+                "let's start exploring.",
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             ],
           ),
@@ -229,10 +220,11 @@ class _HomeStudentState extends State<HomeStudent> {
             );
             break;
           case 2: // Community tab
-            // Create new community post
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Community feature coming soon!')),
-            );
+            // UPDATED: Create new community post
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CreatePostScreen()),
+            ).then((_) => setState(() {}));
             break;
         }
       },

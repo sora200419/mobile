@@ -204,6 +204,7 @@ class _ProfileScreen extends State<ProfileScreen> {
             ),
           ),
           Divider(),
+          // todo: read completed task from firestore
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(
