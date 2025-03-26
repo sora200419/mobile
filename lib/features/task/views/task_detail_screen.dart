@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
-import 'package:mobiletesting/features/task/views/location_tacking_screen.dart';
+import 'package:mobiletesting/features/task/views/location_tracking_screen.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:mobiletesting/features/task/views/task_rating_screen.dart';
 import 'package:mobiletesting/features/task/services/rating_service.dart';
@@ -597,11 +597,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             task.status == 'in_transit') &&
         (isRequester || isProvider);
 
-    // Rating button logic - can rate only if the task is completed and user is a requester (student)
+    // Rating button logic - can rate only if the task is completed and user is a student
     final bool isCompleted = task.status == 'completed';
     final bool canRate = isCompleted && isRequester && !_hasUserRatedTask;
 
-    // Define who to rate - only students can rate runners
+    // Define who to rate - students can only rate runners, not the other way around
     String? userIdToRate;
     String? userNameToRate;
 
@@ -609,10 +609,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       // Requester (student) rates the provider (runner)
       userIdToRate = task.providerId!;
       userNameToRate = task.providerName ?? 'Runner';
-    } else {
-      // Provider (runner) cannot rate requester (student)
-      userIdToRate = null;
-      userNameToRate = null;
     }
 
     return SingleChildScrollView(
@@ -816,33 +812,35 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
 
-          // Live location tracking (only for in_transit tasks)
+          // Location tracking button for in_transit tasks
           if (task.status == 'in_transit' && task.id != null)
             Column(
               children: [
                 const SizedBox(height: 16),
-                _isLocationTrackingActive
-                    ? LocationTrackingView(
-                      taskId: task.id!,
-                      taskTitle: task.title,
-                    )
-                    : Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.location_disabled,
-                            size: 48,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Location tracking is not active for this task.',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.map),
+                    label: const Text('Track Runner Location'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                const SizedBox(height: 24),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => LocationTrackingScreen(
+                                task: task,
+                                isStudent: isRequester,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ),
 
@@ -888,7 +886,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
           const SizedBox(height: 24),
 
-          // Rating button (only for completed tasks)
+          // Rating button (only for completed tasks and students)
           if (canRate && userIdToRate != null && userNameToRate != null)
             SizedBox(
               width: double.infinity,
@@ -897,7 +895,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     () =>
                         _navigateToRatingScreen(userIdToRate!, userNameToRate!),
                 icon: const Icon(Icons.star),
-                label: Text('Rate ${isRequester ? "Runner" : "Requester"}'),
+                label: Text('Rate Runner'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -906,7 +904,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
 
           // Rating completed message
-          if (isCompleted && _hasUserRatedTask)
+          if (isCompleted && isRequester && _hasUserRatedTask)
             Container(
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(top: 16),

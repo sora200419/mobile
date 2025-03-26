@@ -90,12 +90,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildStatCard(
-                      icon: Icons.check_circle,
-                      color: Colors.green,
-                      title: 'Tasks Completed',
-                      statFuture: _getCompletedTasksCount(userId),
-                    ),
-                    _buildStatCard(
                       icon: Icons.local_fire_department,
                       color: Colors.orange,
                       title: 'Login Streak',

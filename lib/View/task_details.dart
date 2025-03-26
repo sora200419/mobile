@@ -4,7 +4,6 @@ import 'package:mobiletesting/View/status_tag.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
@@ -55,7 +54,9 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
           });
           print('Successfully geocoded to: $_taskLocation');
         } else {
-          print('Unable to find the latitude and longitude for this address: ${widget.task.location}');
+          print(
+            'Unable to find the latitude and longitude for this address: ${widget.task.location}',
+          );
           setState(() {
             _isLoadingLocation = false;
           });
@@ -561,21 +562,13 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
         return;
     }
 
-      // Close the loading dialog and the task details page
-      Navigator.pop(context); // Close loading dialog
-      Navigator.pop(context); // Return to previous screen
-    } catch (error) {
-      // Close the loading dialog
+    try {
+      await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
+        'status': newStatus,
+      });
       Navigator.pop(context);
-
-      // Show error message
-      print("Error updating task: $error");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating task: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    } catch (error) {
+      print("Error updating task status: $error");
     }
   }
 
