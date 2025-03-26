@@ -597,22 +597,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             task.status == 'in_transit') &&
         (isRequester || isProvider);
 
-    // Rating button logic - can rate only if the task is completed
+    // Rating button logic - can rate only if the task is completed and user is a requester (student)
     final bool isCompleted = task.status == 'completed';
-    final bool canRate = isCompleted && !_hasUserRatedTask;
+    final bool canRate = isCompleted && isRequester && !_hasUserRatedTask;
 
-    // Define who to rate based on user role
+    // Define who to rate - only students can rate runners
     String? userIdToRate;
     String? userNameToRate;
 
     if (isRequester && task.providerId != null) {
-      // Requester rates the provider
+      // Requester (student) rates the provider (runner)
       userIdToRate = task.providerId!;
       userNameToRate = task.providerName ?? 'Runner';
-    } else if (isProvider) {
-      // Provider rates the requester
-      userIdToRate = task.requesterId;
-      userNameToRate = task.requesterName;
+    } else {
+      // Provider (runner) cannot rate requester (student)
+      userIdToRate = null;
+      userNameToRate = null;
     }
 
     return SingleChildScrollView(
