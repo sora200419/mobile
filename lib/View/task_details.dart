@@ -4,6 +4,7 @@ import 'package:mobiletesting/View/status_tag.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 
 class TaskDetailsPage extends StatelessWidget {
@@ -179,88 +180,78 @@ class TaskDetailsPage extends StatelessWidget {
     String taskId,
     String currentStatus,
   ) async {
-    String newStatus;
-    switch (currentStatus) {
-      case 'open':
-        newStatus = 'assigned';
-        // get current runner uid and name
-        final FirebaseAuth auth = FirebaseAuth.instance;
-        final User? user = auth.currentUser;
-        if (user != null) {
-          final String providerId = user.uid;
-          final String providerName = await _getCurrentRunnerName();
-          try {
-            await FirebaseFirestore.instance
-                .collection('tasks')
-                .doc(taskId)
-                .update({
-                  'status': newStatus,
-                  'providerId': providerId,
-                  'providerName': providerName,
-                });
-            Navigator.pop(context);
-          } catch (error) {
-            print("Error updating task status: $error");
-          }
-        } else {
-          print("Error: User not logged in.");
-        }
-        return; // Update providerId and providerName when the status is 'open' only
-      case 'assigned':
-        newStatus = 'in_transit';
-        break;
-      case 'in_transit':
-        newStatus = 'completed';
-        final FirebaseAuth auth = FirebaseAuth.instance;
-        final User? user = auth.currentUser;
-        if (user != null) {
-          final String userId = user.uid;
-          final int rewardPoints = task.rewardPoints;
-          try {
-            DocumentSnapshot userDoc =
-                await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(userId)
-                    .get();
+    // Import TaskService and GamificationService
+    final taskService = TaskService();
 
-            if (userDoc.exists) {
-              int currentPoints =
-                  (userDoc.data() as Map<String, dynamic>)['points'] ?? 0;
-              int newPoints = currentPoints + rewardPoints;
-
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(userId)
-                  .update({'points': newPoints});
-              print('User points updated: $newPoints');
-            } else {
-              print('User document not found.');
-            }
-
-            // update task status
-            await FirebaseFirestore.instance
-                .collection('tasks')
-                .doc(taskId)
-                .update({'status': newStatus});
-            Navigator.pop(context);
-          } catch (error) {
-            print("Error updating task status or user points: $error");
-          }
-        } else {
-          print("Error: User not logged in.");
-        }
-        return;
-      default:
-        return;
-    }
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(child: CircularProgressIndicator());
+      },
+    );
 
     try {
-      await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
-        'status': newStatus,
-      });
-      Navigator.pop(context);
+      switch (currentStatus) {
+        case 'open':
+          // Accept the task using TaskService
+          await taskService.acceptTask(taskId);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task accepted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          break;
+
+        case 'assigned':
+          // Mark task as in transit using TaskService
+          await taskService.markTaskInTransit(taskId);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task marked as in transit'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+          break;
+
+        case 'in_transit':
+          // Complete the task using TaskService
+          await taskService.completeTask(taskId);
+
+          // The completeTask method includes achievement checking logic
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task completed successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          break;
+
+        default:
+          // No action needed for other statuses
+          Navigator.pop(context); // Close the loading dialog
+          return;
+      }
+
+      // Close the loading dialog and the task details page
+      Navigator.pop(context); // Close loading dialog
+      Navigator.pop(context); // Return to previous screen
     } catch (error) {
-      print("Error updating task status: $error");
+      // Close the loading dialog
+      Navigator.pop(context);
+
+      // Show error message
+      print("Error updating task: $error");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating task: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

@@ -1,4 +1,3 @@
-// lib/features/task/services/chat_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -8,6 +7,7 @@ class Message {
   final String senderName;
   final String message;
   final DateTime timestamp;
+  final bool isRead;
 
   Message({
     required this.id,
@@ -15,6 +15,7 @@ class Message {
     required this.senderName,
     required this.message,
     required this.timestamp,
+    this.isRead = false,
   });
 
   factory Message.fromFirestore(DocumentSnapshot doc) {
@@ -25,6 +26,7 @@ class Message {
       senderName: data['senderName'] ?? '',
       message: data['message'] ?? '',
       timestamp: (data['timestamp'] as Timestamp).toDate(),
+      isRead: data['read'] ?? false,
     );
   }
 
@@ -34,6 +36,7 @@ class Message {
       'senderName': senderName,
       'message': message,
       'timestamp': timestamp,
+      'read': isRead,
     };
   }
 }
@@ -47,6 +50,8 @@ class ChatService {
       .collection('chats');
   final CollectionReference usersCollection = FirebaseFirestore.instance
       .collection('users');
+  final CollectionReference tasksCollection = FirebaseFirestore.instance
+      .collection('tasks');
 
   // Send a message in a task chat
   Future<void> sendMessage(String taskId, String message) async {
@@ -58,6 +63,21 @@ class ChatService {
       DocumentSnapshot userDoc = await usersCollection.doc(user.uid).get();
       String userName = (userDoc.data() as Map<String, dynamic>)['name'] ?? '';
 
+      // Get task details to validate participants
+      DocumentSnapshot taskDoc = await tasksCollection.doc(taskId).get();
+      if (!taskDoc.exists) {
+        throw Exception('Task not found');
+      }
+
+      Map<String, dynamic> taskData = taskDoc.data() as Map<String, dynamic>;
+      String requesterId = taskData['requesterId'] ?? '';
+      String? providerId = taskData['providerId'];
+
+      // Verify the current user is either the requester or provider
+      if (user.uid != requesterId && user.uid != providerId) {
+        throw Exception('You are not authorized to send messages in this chat');
+      }
+
       // Create chat room ID based on task ID
       String chatRoomId = 'task_$taskId';
 
@@ -67,15 +87,20 @@ class ChatService {
         'senderName': userName,
         'message': message,
         'timestamp': DateTime.now(),
+        'taskId': taskId,
+        'read': false,
       });
 
       // Update the chat room's last message info
       await chatsCollection.doc(chatRoomId).set({
         'taskId': taskId,
+        'requesterId': requesterId,
+        'providerId': providerId,
         'lastMessage': message,
         'lastSenderId': user.uid,
         'lastSenderName': userName,
         'lastMessageTime': DateTime.now(),
+        'participants': [requesterId, providerId],
       }, SetOptions(merge: true));
     } catch (e) {
       print('Error sending message: $e');
@@ -86,16 +111,48 @@ class ChatService {
   // Get messages from a task chat
   Stream<List<Message>> getMessages(String taskId) {
     String chatRoomId = 'task_$taskId';
+    User? currentUser = _auth.currentUser;
 
-    return chatsCollection
-        .doc(chatRoomId)
-        .collection('messages')
-        .orderBy('timestamp', descending: true)
+    if (currentUser == null) {
+      return Stream.value([]);
+    }
+
+    // First, check if the task exists and if the user is a participant
+    return FirebaseFirestore.instance
+        .collection('tasks')
+        .doc(taskId)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Message.fromFirestore(doc))
-              .toList();
+        .asyncMap((taskSnapshot) async {
+          if (!taskSnapshot.exists) {
+            return <Message>[];
+          }
+
+          Map<String, dynamic> taskData =
+              taskSnapshot.data() as Map<String, dynamic>;
+          String requesterId = taskData['requesterId'] ?? '';
+          String? providerId = taskData['providerId'];
+
+          // Verify the current user is a participant
+          if (currentUser.uid != requesterId && currentUser.uid != providerId) {
+            print('Current user is not authorized to view this chat');
+            return <Message>[];
+          }
+
+          // If authorized, get and return messages
+          QuerySnapshot snapshot =
+              await chatsCollection
+                  .doc(chatRoomId)
+                  .collection('messages')
+                  .orderBy('timestamp', descending: true)
+                  .get();
+
+          List<Message> messages =
+              snapshot.docs.map((doc) => Message.fromFirestore(doc)).toList();
+
+          // Mark messages as read if they're from the other user
+          _markMessagesAsRead(chatRoomId, currentUser.uid);
+
+          return messages;
         });
   }
 
@@ -103,13 +160,12 @@ class ChatService {
   Stream<QuerySnapshot> getUserChatRooms() {
     User? user = _auth.currentUser;
     if (user == null) {
-      // Return an empty stream instead of trying to create an empty QuerySnapshot
       return Stream.empty();
     }
 
-    // This is a simplified approach. In a complete app, you'd need to
-    // track which chats a user is part of (e.g., by adding a 'participants' array to each chat)
+    // Get chat rooms where current user is either requester or provider
     return chatsCollection
+        .where('participants', arrayContains: user.uid)
         .orderBy('lastMessageTime', descending: true)
         .snapshots();
   }
@@ -148,16 +204,13 @@ class ChatService {
   }
 
   // Mark all messages in a chat room as read
-  Future<void> markMessagesAsRead(String chatRoomId) async {
+  Future<void> _markMessagesAsRead(String chatRoomId, String userId) async {
     try {
-      User? user = _auth.currentUser;
-      if (user == null) return;
-
       QuerySnapshot unreadMessages =
           await chatsCollection
               .doc(chatRoomId)
               .collection('messages')
-              .where('senderId', isNotEqualTo: user.uid)
+              .where('senderId', isNotEqualTo: userId)
               .where('read', isEqualTo: false)
               .get();
 
@@ -166,9 +219,41 @@ class ChatService {
         batch.update(doc.reference, {'read': true});
       }
 
-      await batch.commit();
+      if (unreadMessages.docs.isNotEmpty) {
+        await batch.commit();
+      }
     } catch (e) {
       print('Error marking messages as read: $e');
     }
+  }
+
+  // Get total unread count across all chats
+  Stream<int> getTotalUnreadCount() {
+    User? user = _auth.currentUser;
+    if (user == null) {
+      return Stream.value(0);
+    }
+
+    return chatsCollection
+        .where('participants', arrayContains: user.uid)
+        .snapshots()
+        .asyncMap((chatRooms) async {
+          int totalUnread = 0;
+
+          for (var doc in chatRooms.docs) {
+            String chatId = doc.id;
+            QuerySnapshot unreadMessages =
+                await chatsCollection
+                    .doc(chatId)
+                    .collection('messages')
+                    .where('senderId', isNotEqualTo: user.uid)
+                    .where('read', isEqualTo: false)
+                    .get();
+
+            totalUnread += unreadMessages.docs.length;
+          }
+
+          return totalUnread;
+        });
   }
 }
