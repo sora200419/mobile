@@ -1,4 +1,3 @@
-// lib\features\task\views\task_chat_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +20,29 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
   final ScrollController _scrollController = ScrollController();
 
   bool _isSending = false;
+  bool _isAuthorized = false;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthorization();
+  }
+
+  void _checkAuthorization() {
+    String currentUserId = _auth.currentUser?.uid ?? '';
+    String requesterId = widget.task.requesterId;
+    String? providerId = widget.task.providerId;
+
+    // Only requester and provider can chat
+    setState(() {
+      _isAuthorized =
+          (currentUserId == requesterId || currentUserId == providerId);
+      if (!_isAuthorized) {
+        _errorMessage = 'You are not authorized to view this chat.';
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -29,39 +51,22 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
     super.dispose();
   }
 
-  // Send a new message
+  // Send a message
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    if (_messageController.text.trim().isEmpty || !_isAuthorized) return;
 
     setState(() {
       _isSending = true;
     });
 
     try {
-      // Determine who to send the message to
-      String currentUserId = _auth.currentUser?.uid ?? '';
-      String recipientId = '';
-
-      // If current user is the requester, send to provider
-      if (currentUserId == widget.task.requesterId) {
-        recipientId = widget.task.providerId ?? '';
-      }
-      // If current user is the provider, send to requester
-      else if (currentUserId == widget.task.providerId) {
-        recipientId = widget.task.requesterId;
-      }
-
-      if (recipientId.isEmpty) {
-        throw Exception('Recipient not found');
-      }
-
       // Send the message
       await _chatService.sendMessage(
         widget.task.id!,
         _messageController.text.trim(),
       );
 
-      // Clear the input field
+      // Clear input field
       _messageController.clear();
 
       // Scroll to bottom after sending
@@ -91,95 +96,161 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Chat: ${widget.task.title}')),
-      body: Column(
-        children: [
-          // Chat messages
-          Expanded(
-            child: StreamBuilder<List<Message>>(
-              stream: _chatService.getMessages(widget.task.id!),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-
-                final messages = snapshot.data ?? [];
-
-                if (messages.isEmpty) {
-                  return const Center(
-                    child: Text('No messages yet. Start the conversation!'),
-                  );
-                }
-
-                String currentUserId = _auth.currentUser?.uid ?? '';
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true, // Latest messages at the bottom
-                  padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                    final isMe = message.senderId == currentUserId;
-
-                    return _buildMessageBubble(message, isMe);
-                  },
-                );
-              },
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Chat: ${widget.task.title}', style: TextStyle(fontSize: 16)),
+            Text(
+              widget.task.status.toUpperCase(),
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
-          ),
-
-          // Message input
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.5),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Message text field
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(16),
-                    ),
-                    minLines: 1,
-                    maxLines: 5,
-                    textCapitalization: TextCapitalization.sentences,
-                  ),
-                ),
-
-                // Send button
-                IconButton(
-                  icon:
-                      _isSending
-                          ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : const Icon(Icons.send, color: Colors.blue),
-                  onPressed: _isSending ? null : _sendMessage,
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
+      body:
+          !_isAuthorized
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    SizedBox(height: 16),
+                    Text(
+                      _errorMessage,
+                      style: TextStyle(fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+              : Column(
+                children: [
+                  // Chat messages
+                  Expanded(
+                    child: StreamBuilder<List<Message>>(
+                      stream: _chatService.getMessages(widget.task.id!),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 48,
+                                  color: Colors.red,
+                                ),
+                                SizedBox(height: 16),
+                                Text('Error: ${snapshot.error}'),
+                                SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () => setState(() {}),
+                                  child: Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        final messages = snapshot.data ?? [];
+
+                        if (messages.isEmpty) {
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No messages yet.\nStart the conversation!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        String currentUserId = _auth.currentUser?.uid ?? '';
+
+                        return ListView.builder(
+                          controller: _scrollController,
+                          reverse: true, // Latest messages at the bottom
+                          padding: const EdgeInsets.all(16),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            final isMe = message.senderId == currentUserId;
+
+                            return _buildMessageBubble(message, isMe);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Message input
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.5),
+                          spreadRadius: 1,
+                          blurRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        // Message text field
+                        Expanded(
+                          child: TextField(
+                            controller: _messageController,
+                            decoration: const InputDecoration(
+                              hintText: 'Type a message...',
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.all(16),
+                            ),
+                            minLines: 1,
+                            maxLines: 5,
+                            textCapitalization: TextCapitalization.sentences,
+                            onSubmitted: (_) => _sendMessage(),
+                          ),
+                        ),
+
+                        // Send button
+                        IconButton(
+                          icon:
+                              _isSending
+                                  ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Icon(Icons.send, color: Colors.blue),
+                          onPressed: _isSending ? null : _sendMessage,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
     );
   }
 
@@ -190,14 +261,17 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
       child: Row(
         mainAxisAlignment:
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe)
             CircleAvatar(
               backgroundColor: Colors.grey.shade200,
+              radius: 16,
               child: Text(
                 message.senderName.isNotEmpty
                     ? message.senderName[0].toUpperCase()
                     : '?',
+                style: TextStyle(fontSize: 14),
               ),
             ),
 
@@ -220,6 +294,7 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isMe ? Colors.white : Colors.black,
+                        fontSize: 12,
                       ),
                     ),
 
@@ -232,9 +307,9 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
 
                   // Timestamp
                   Text(
-                    DateFormat('HH:mm, dd MMM').format(message.timestamp),
+                    _formatTimestamp(message.timestamp),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       color:
                           isMe
                               ? Colors.white.withOpacity(0.7)
@@ -251,14 +326,38 @@ class _TaskChatScreenState extends State<TaskChatScreen> {
           if (isMe)
             CircleAvatar(
               backgroundColor: Colors.blue.shade100,
+              radius: 16,
               child: Text(
                 _auth.currentUser?.displayName?.isNotEmpty == true
                     ? _auth.currentUser!.displayName![0].toUpperCase()
-                    : '?',
+                    : 'Y',
+                style: TextStyle(fontSize: 14),
               ),
             ),
         ],
       ),
     );
+  }
+
+  // Format timestamp for chat messages
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate = DateTime(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+    );
+
+    if (messageDate == today) {
+      // Today, show time only
+      return "Today ${DateFormat('HH:mm').format(timestamp)}";
+    } else if (messageDate == today.subtract(Duration(days: 1))) {
+      // Yesterday
+      return "Yesterday ${DateFormat('HH:mm').format(timestamp)}";
+    } else {
+      // Other days, show date and time
+      return DateFormat('dd/MM/yyyy HH:mm').format(timestamp);
+    }
   }
 }
