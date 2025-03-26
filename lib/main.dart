@@ -1,14 +1,17 @@
-import 'package:mobiletesting/View/home_runner.dart';
+import 'package:mobiletesting/View/home_student.dart';
 import 'package:mobiletesting/utils/constants/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/View/login_screen.dart';
+import 'package:mobiletesting/services/dynamic_links_service.dart'; // Add this
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  DynamicLinksService().initialize();
 
   runApp(
     MultiProvider(
@@ -28,7 +31,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dynamicLinksService = DynamicLinksService();
+
     return MaterialApp(
+      navigatorKey: dynamicLinksService.navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'CampusLink',
       theme: ThemeData(
@@ -62,7 +68,7 @@ class MyApp extends StatelessWidget {
       home: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
           return authProvider.isAuthenticated
-              ? HomeRunner()
+              ? HomeStudent()
               : const LoginScreen();
         },
       ),

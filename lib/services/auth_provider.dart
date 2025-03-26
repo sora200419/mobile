@@ -42,11 +42,14 @@ class AuthProvider extends ChangeNotifier {
 
     String? result = await _authService.login(email: email, password: password);
 
-    _isLoading = false;
     if (result != null && !result.contains("ERROR")) {
       await checkUser();
+      _isLoading = false;
+      notifyListeners();
       return null;
     } else {
+      _isLoading = false;
+      notifyListeners();
       return result;
     }
   }
