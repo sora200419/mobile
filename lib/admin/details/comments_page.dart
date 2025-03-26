@@ -50,7 +50,7 @@ class _CommentsPageState extends State<CommentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    Provider.of<AuthProvider>(context);
     final CollectionReference comments = FirebaseFirestore.instance
         .collection('community_posts')
         .doc(widget.postId)
@@ -168,11 +168,11 @@ class _CommentsPageState extends State<CommentsPage> {
                               child: Text(
                                 data['content'] ?? 'No Content',
                                 style: const TextStyle(fontSize: 15),
-                                maxLines: isExpanded ? null : 2, 
+                                maxLines: isExpanded ? null : 2,
                                 overflow:
                                     isExpanded
                                         ? TextOverflow.visible
-                                        : TextOverflow.ellipsis, 
+                                        : TextOverflow.ellipsis,
                               ),
                             ),
                           ],
