@@ -7,6 +7,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:mobiletesting/features/task/model/task_model.dart';
+import 'package:mobiletesting/features/task/services/task_service.dart';
+import 'package:mobiletesting/View/home_runner.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -211,17 +213,9 @@ class _ProfileScreen extends State<ProfileScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: 10,
-              itemBuilder: (context, index) {
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    title: Text("Order #$index"),
-                    subtitle: Text("Order details go here."),
-                  ),
-                );
-              },
+            child: TaskListWidget(
+              taskStream: TaskService().getTasksForRunnerByStatus("completed"),
+              searchQuery: '',
             ),
           ),
         ],

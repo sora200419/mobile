@@ -9,6 +9,7 @@ import 'package:mobiletesting/features/gamification/views/achievements_screen.da
 import 'package:mobiletesting/features/gamification/views/leaderboard_screen.dart';
 import 'package:mobiletesting/features/gamification/views/rewards_screen.dart';
 import 'package:mobiletesting/utils/ui_utils.dart';
+import 'package:mobiletesting/features/community/views/bookmarked_posts_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({Key? key}) : super(key: key);
@@ -158,6 +159,25 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   child: Column(
                     children: [
+                      // NEW: Saved Posts
+                      ListTile(
+                        leading: const Icon(
+                          Icons.bookmark,
+                          color: Colors.deepPurple,
+                        ),
+                        title: const Text('Saved Posts'),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => const BookmarkedPostsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(),
                       ListTile(
                         leading: const Icon(Icons.logout, color: Colors.red),
                         title: const Text(
