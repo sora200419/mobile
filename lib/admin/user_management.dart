@@ -4,18 +4,30 @@ import 'package:mobiletesting/admin/details/user_details.dart';
 import 'package:mobiletesting/admin/admin_management.dart';
 
 class UserManagementPage extends StatefulWidget {
+  const UserManagementPage({Key? key}) : super(key: key);
+
   @override
   _UserManagementPageState createState() => _UserManagementPageState();
 }
 
 class _UserManagementPageState extends State<UserManagementPage> {
-  String _searchQuery = ''; 
-  String? _selectedRole; 
-  String _sortField = 'points'; 
-  bool _isDescending = true; 
+  String _searchQuery = '';
+  String? _selectedRole;
+  String _sortField = 'points'; // Default sort by points
+  bool _isDescending = true;
 
   @override
   Widget build(BuildContext context) {
+    // Rating option only enable for runner
+    bool isRatingEnabled = _selectedRole == 'Runner';
+    if (_sortField == 'averageRating' && !isRatingEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _sortField = 'points';
+        });
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("User Management"),
@@ -74,20 +86,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Row(
               children: [
-                // filter role
+                // Filter role
                 Expanded(
                   flex: 2,
                   child: DropdownButton<String>(
                     value: _selectedRole ?? 'All',
                     isExpanded: true,
-                    items: ['All', 'Student', 'Runner']
-                        .map(
-                          (role) => DropdownMenuItem<String>(
-                            value: role,
-                            child: Text(role),
-                          ),
-                        )
-                        .toList(),
+                    items:
+                        ['All', 'Student', 'Runner']
+                            .map(
+                              (role) => DropdownMenuItem<String>(
+                                value: role,
+                                child: Text(role),
+                              ),
+                            )
+                            .toList(),
                     onChanged: (value) {
                       setState(() {
                         _selectedRole = value == 'All' ? null : value;
@@ -96,7 +109,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // sequence
+                // Sort field
                 Expanded(
                   flex: 2,
                   child: DropdownButton<String>(
@@ -104,19 +117,31 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     isExpanded: true,
                     items: [
                       const DropdownMenuItem(
-                          value: 'points', child: Text('Points')),
-                      const DropdownMenuItem(
-                          value: 'averageRating', child: Text('Rating')),
+                        value: 'points',
+                        child: Text('Points'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'averageRating',
+                        enabled: isRatingEnabled,
+                        child: Text(
+                          'Rating',
+                          style: TextStyle(
+                            color: isRatingEnabled ? Colors.black : Colors.grey,
+                          ),
+                        ), // Disable if not Runner
+                      ),
                     ],
                     onChanged: (value) {
-                      setState(() {
-                        _sortField = value!;
-                      });
+                      if (value != null) {
+                        setState(() {
+                          _sortField = value;
+                        });
+                      }
                     },
                   ),
                 ),
                 const SizedBox(width: 8),
-                // change sequence
+                // Sort order toggle
                 IconButton(
                   icon: Icon(
                     _isDescending ? Icons.arrow_downward : Icons.arrow_upward,
@@ -143,12 +168,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
                 var users = snapshot.data!.docs;
 
-                // search by name
-                var filteredUsers = users.where((doc) {
-                  var user = doc.data() as Map<String, dynamic>;
-                  String name = (user['name'] ?? '').toString().toLowerCase();
-                  return name.contains(_searchQuery);
-                }).toList();
+                // Search by name
+                var filteredUsers =
+                    users.where((doc) {
+                      var user = doc.data() as Map<String, dynamic>;
+                      String name =
+                          (user['name'] ?? '').toString().toLowerCase();
+                      return name.contains(_searchQuery);
+                    }).toList();
 
                 if (filteredUsers.isEmpty) {
                   return const Center(
@@ -162,7 +189,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 return ListView.builder(
                   itemCount: filteredUsers.length,
                   itemBuilder: (context, index) {
-                    var user = filteredUsers[index].data() as Map<String, dynamic>;
+                    var user =
+                        filteredUsers[index].data() as Map<String, dynamic>;
 
                     IconData leadingIcon;
                     switch (user['role']) {
@@ -177,24 +205,69 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     }
 
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       child: ListTile(
                         leading: Icon(leadingIcon),
-                        title: Text(user['name'] ?? 'Unknown'),
-                        subtitle: Text(
-                            "${user['role']} - ${user['levelName'] ?? 'N/A'}\nPoints: ${user['points'] ?? 0}\nRating: ${user['averageRating'] ?? 0} (${user['ratingCount'] ?? 0} reviews)"),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.settings, color: Colors.blue),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    UserDetailPage(userId: filteredUsers[index].id),
-                              ),
-                            );
-                          },
+                        title: Text(
+                          user['name'] ?? 'Unknown',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
+                        subtitle:
+                            user['role'] == 'Runner'
+                                ? ClipRect(
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          "${(user['averageRating'] ?? 0.0).toStringAsFixed(1)} "
+                                          "(${user['ratingCount'] ?? 0} reviews)",
+                                          style: const TextStyle(fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                                : null,
+                        trailing: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 100),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              // Only show points for both roles
+                              Text(
+                                "${user['points'] ?? 0} pts",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => UserDetailPage(
+                                    userId: filteredUsers[index].id,
+                                  ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
@@ -207,19 +280,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
-  // search users
   Stream<QuerySnapshot> _buildUserStream() {
-    Query query = FirebaseFirestore.instance
-        .collection('users')
-        .where('role', isNotEqualTo: 'Admin');
+    Query query = FirebaseFirestore.instance.collection('users');
 
-    // filter role
     if (_selectedRole != null) {
       query = query.where('role', isEqualTo: _selectedRole);
+    } else {
+
+      query = query.where('role', whereIn: ['Student', 'Runner']);
     }
 
-    // handle null
     query = query.orderBy(_sortField, descending: _isDescending);
+
+    if (_sortField != 'role') {
+      query = query.orderBy('role');
+    }
+    query = query.orderBy('name');
 
     return query.snapshots();
   }

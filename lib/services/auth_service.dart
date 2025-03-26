@@ -1,4 +1,3 @@
-// lib\services\auth_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -7,8 +6,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   // Firestore instance
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  // function to handle user signup
 
+  // Function to handle user signup
   Future<String?> signup({
     required String name,
     required String email,
@@ -16,46 +15,64 @@ class AuthService {
     required String role,
   }) async {
     try {
-      // create user in firebase authentication with email and password
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(
-            email: email.trim(),
-            password: password.trim(),
-          );
+      // Create user in Firebase Authentication with email and password
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password.trim(),
+      );
 
-      // save additional user data in firestore (name, role, email)
-      await _firestore.collection("users").doc(userCredential.user!.uid).set({
+      // Prepare user data with basic fields
+      Map<String, dynamic> userData = {
         'name': name.trim(),
-        "email": email.trim(),
-        "role": role.trim(),
-      });
-      return null; // success : no error message
+        'email': email.trim(),
+        'role': role.trim(),
+      };
+
+      // Add default values based on role
+      if (role.trim() == 'Student') {
+        userData.addAll({
+          'points': 0, // Default value for points (int) for Student
+          'isBanned': false, // Add isBanned field with default value false
+        });
+      } else if (role.trim() == 'Runner') {
+        userData.addAll({
+          'points': 0,          // Default value for points (int) for Runner
+          'averageRating': 0.0, // Default value for averageRating (double) for Runner
+          'ratingCount': 0,     // Default value for ratingCount (int) for Runner
+          'isBanned': false, // Add isBanned field with default value false
+        });
+      }
+      // Admin role does not need additional fields
+
+      // Save user data in Firestore
+      await _firestore.collection("users").doc(userCredential.user!.uid).set(userData);
+
+      return null; // Success: no error message
     } catch (e) {
-      return e.toString(); // error : return the exception
+      return e.toString(); // Error: return the exception
     }
   }
 
-  // function to handle user login
+  // Function to handle user login
   Future<String?> login({
     required String email,
     required String password,
   }) async {
     try {
-      // sign in user using firebase authentication with email and password
+      // Sign in user using Firebase Authentication with email and password
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
       );
 
-      // fetching the user's role from firestore to determine access level
-      DocumentSnapshot userDoc =
-          await _firestore
-              .collection("users")
-              .doc(userCredential.user!.uid)
-              .get();
-      return userDoc['role']; // return the user's role (admin/student/runner)
+      // Fetching the user's role from Firestore to determine access level
+      DocumentSnapshot userDoc = await _firestore
+          .collection("users")
+          .doc(userCredential.user!.uid)
+          .get();
+      return userDoc['role']; // Return the user's role (Admin/Student/Runner)
     } catch (e) {
-      return e.toString(); // error : return the exception
+      return e.toString(); // Error: return the exception
     }
   }
 }
