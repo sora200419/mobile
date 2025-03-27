@@ -12,12 +12,16 @@ class AuthProvider extends ChangeNotifier {
   String? _username;
   bool _isLoading = false;
   bool _isAuthenticated = false;
+  bool _isBanned = false;
+  DateTime? _banEnd;
 
   User? get user => _user;
   String? get role => _role;
   String? get username => _username;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _isAuthenticated;
+  bool get isBanned => _isBanned;
+  DateTime? get banEnd => _banEnd;
 
   Future<void> checkUser() async {
     _user = FirebaseAuth.instance.currentUser;
@@ -26,10 +30,13 @@ class AuthProvider extends ChangeNotifier {
     if (_isAuthenticated) {
       await _fetchUserRole();
       await fetchUsername();
+      await _fetchBanStatus();
     }
 
     print(username);
     print(role);
+    print('Is banned: $isBanned');
+    print('Ban end: $banEnd');
     notifyListeners();
   }
 
@@ -58,6 +65,9 @@ class AuthProvider extends ChangeNotifier {
     await FirebaseAuth.instance.signOut();
     _user = null;
     _role = null;
+    _username = null;
+    _isBanned = false;
+    _banEnd = null;
     _isAuthenticated = false;
     notifyListeners();
 
@@ -86,6 +96,29 @@ class AuthProvider extends ChangeNotifier {
               .doc(_user!.uid)
               .get();
       _username = userDoc['name'];
+    }
+  }
+
+  Future<void> _fetchBanStatus() async {
+    if (_user != null) {
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance
+              .collection("users")
+              .doc(_user!.uid)
+              .get();
+      
+      // Get the data map and safely check for fields
+      Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
+      
+      // Check if isBanned exists and is a boolean, default to false if not present
+      _isBanned = data?.containsKey('isBanned') == true ? data!['isBanned'] as bool : false;
+      
+      // Check if banEnd exists and convert if present
+      if (data?.containsKey('banEnd') == true && data!['banEnd'] != null) {
+        _banEnd = (data['banEnd'] as Timestamp).toDate();
+      } else {
+        _banEnd = null;
+      }
     }
   }
 }

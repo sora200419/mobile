@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'package:mobiletesting/admin/details/blacklist_page.dart';
 import 'package:mobiletesting/View/login_screen.dart';
+import 'package:mobiletesting/services/auth_provider.dart' as custom; 
 
 class SettingsPage extends StatefulWidget {
   @override
@@ -24,7 +26,6 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadUserData();
   }
 
-  // 加载用户数据
   Future<void> _loadUserData() async {
     try {
       User? user = _auth.currentUser;
@@ -35,7 +36,7 @@ class _SettingsPageState extends State<SettingsPage> {
           setState(() {
             currentName = userDoc['name'] ?? 'Unnamed';
             currentEmail = userDoc['email'] ?? 'No email set';
-            _nameController.text = currentName ?? ''; // 初始化名字输入框
+            _nameController.text = currentName ?? '';
             _isLoading = false;
           });
         } else {
@@ -53,10 +54,9 @@ class _SettingsPageState extends State<SettingsPage> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No user signed in')),
-        );
-        // 如果没有用户登录，跳转到登录页面
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('No user signed in')));
+
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => LoginScreen()),
           (Route<dynamic> route) => false,
@@ -67,17 +67,14 @@ class _SettingsPageState extends State<SettingsPage> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading user data: $e')),
-      );
+          SnackBar(content: Text('Error loading user data: $e')));
     }
   }
 
-  // 更新用户名
   Future<void> _updateName() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Name cannot be empty')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Name cannot be empty')));
       return;
     }
 
@@ -91,37 +88,28 @@ class _SettingsPageState extends State<SettingsPage> {
           currentName = _nameController.text.trim();
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Name updated successfully')),
-        );
+            SnackBar(content: Text('Name updated successfully')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating name: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error updating name: $e')));
     }
   }
 
-  // 退出登录
   Future<void> _logout() async {
     try {
-      await _auth.signOut();
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-        (Route<dynamic> route) => false,
-      );
+      final authProvider = Provider.of<custom.AuthProvider>(context, listen: false); 
+      await authProvider.logout(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error signing out: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error signing out: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(

@@ -79,6 +79,38 @@ class _LoginScreenState extends State<LoginScreen> {
                           );
 
                           if (error == null) {
+                            // Check ban status for Student and Runner roles
+                            if (authProvider.role == "Student" ||
+                                authProvider.role == "Runner") {
+                              if (authProvider.isBanned == true) {
+                                String banMessage;
+                                if (authProvider.banEnd == null) {
+                                  banMessage =
+                                      "Your account is banned permanently";
+                                } else {
+                                  banMessage =
+                                      "Your account is banned until ${authProvider.banEnd}";
+                                }
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: Text("Access Denied"),
+                                        content: Text(banMessage),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(context),
+                                            child: Text("OK"),
+                                          ),
+                                        ],
+                                      ),
+                                );
+                                return;
+                              }
+                            }
+
+                            // Proceed with navigation if not banned
                             if (authProvider.role == "Admin") {
                               Navigator.pushReplacement(
                                 context,
@@ -96,11 +128,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   builder: (_) => HomeStudent(),
                                 ),
                               );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("Login Failed: $error")),
-                              );
                             }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Login Failed: $error")),
+                            );
                           }
                         },
                         child: Text("Login"),
