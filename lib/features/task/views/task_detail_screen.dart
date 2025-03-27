@@ -813,36 +813,36 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
 
           // Location tracking button for in_transit tasks
-          if (task.status == 'in_transit' && task.id != null)
-            Column(
-              children: [
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.map),
-                    label: const Text('Track Runner Location'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => LocationTrackingScreen(
-                                task: task,
-                                isStudent: isRequester,
-                              ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
+          // if (task.status == 'in_transit' && task.id != null)
+          //   Column(
+          //     children: [
+          //       const SizedBox(height: 16),
+          //       SizedBox(
+          //         width: double.infinity,
+          //         child: ElevatedButton.icon(
+          //           icon: const Icon(Icons.map),
+          //           label: const Text('Track Runner Location'),
+          //           style: ElevatedButton.styleFrom(
+          //             backgroundColor: Colors.blue,
+          //             padding: const EdgeInsets.symmetric(vertical: 12),
+          //           ),
+          //           onPressed: () {
+          //             Navigator.push(
+          //               context,
+          //               MaterialPageRoute(
+          //                 builder:
+          //                     (context) => LocationTrackingScreen(
+          //                       task: task,
+          //                       isStudent: isRequester,
+          //                     ),
+          //               ),
+          //             );
+          //           },
+          //         ),
+          //       ),
+          //       const SizedBox(height: 16),
+          //     ],
+          //   ),
 
           // Action buttons row
           Row(

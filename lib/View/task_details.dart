@@ -250,97 +250,6 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                   ),
                 ),
 
-              // If the task is assigned and in runner view, display location sharing status instead of a button
-              if (widget.task.status == 'in_transit' &&
-                  widget.task.providerId ==
-                      FirebaseAuth.instance.currentUser?.uid)
-                SizedBox(height: 12),
-
-              if (widget.task.status == 'in_transit' &&
-                  widget.task.providerId ==
-                      FirebaseAuth.instance.currentUser?.uid)
-                FutureBuilder<bool>(
-                  future: RunnerLocationService.isTrackingActive(
-                    widget.task.id!,
-                  ),
-                  builder: (context, snapshot) {
-                    final bool isActive = snapshot.data ?? false;
-
-                    return Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isActive ? Colors.green[50] : Colors.amber[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isActive ? Colors.green : Colors.amber,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isActive ? Icons.location_on : Icons.location_off,
-                            color: isActive ? Colors.green : Colors.amber,
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            isActive
-                                ? 'Location Sharing Enabled'
-                                : 'Location Sharing Disabled',
-                            style: TextStyle(
-                              color:
-                                  isActive
-                                      ? Colors.green[700]
-                                      : Colors.amber[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (!isActive) ...[
-                            SizedBox(width: 8),
-                            TextButton(
-                              onPressed: () async {
-                                final runnerId =
-                                    FirebaseAuth.instance.currentUser?.uid;
-                                if (runnerId == null) return;
-
-                                final locationService = RunnerLocationService(
-                                  runnerId,
-                                );
-                                bool success = await locationService
-                                    .startSharingLocation(
-                                      widget.task.id!,
-                                      context,
-                                    );
-                                if (success) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Location sharing manually enabled',
-                                      ),
-                                    ),
-                                  );
-                                  setState(() {});
-                                }
-                              },
-                              child: Text('Manual enable'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.amber[700],
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 0,
-                                ),
-                                minimumSize: Size(0, 0),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  },
-                ),
-
               SizedBox(height: 20),
               Divider(),
               SizedBox(height: 25),
@@ -460,43 +369,45 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
       case 'assigned':
         newStatus = 'in_transit';
 
-        // When the status updates from "assigned" to "in_transit," automatically start location sharing
-        final FirebaseAuth auth = FirebaseAuth.instance;
-        final User? user = auth.currentUser;
-        if (user != null) {
-          // Start location sharing
-          try {
-            final locationService = RunnerLocationService(user.uid);
-            bool success = await locationService.startSharingLocation(
-              taskId,
-              context,
-            );
-            if (success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Location sharing has been automatically started.',
-                  ),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Failed to start location sharing. Please enable location sharing manually.',
-                  ),
-                  duration: Duration(seconds: 4),
-                ),
-              );
-            }
-          } catch (e) {
-            print("Error occured while starting location sharing: $e");
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to start location sharing: $e')),
-            );
-            // Without interrupting the task status update process.
-          }
-        }
+        // Location sharing feature (currently disabled)
+        // // When the status updates from "assigned" to "in_transit," automatically start location sharing
+
+        // final FirebaseAuth auth = FirebaseAuth.instance;
+        // final User? user = auth.currentUser;
+        // if (user != null) {
+        //   // Start location sharing
+        //   try {
+        //     final locationService = RunnerLocationService(user.uid);
+        //     bool success = await locationService.startSharingLocation(
+        //       taskId,
+        //       context,
+        //     );
+        //     if (success) {
+        //       ScaffoldMessenger.of(context).showSnackBar(
+        //         SnackBar(
+        //           content: Text(
+        //             'Location sharing has been automatically started.',
+        //           ),
+        //         ),
+        //       );
+        //     } else {
+        //       ScaffoldMessenger.of(context).showSnackBar(
+        //         SnackBar(
+        //           content: Text(
+        //             'Failed to start location sharing. Please enable location sharing manually.',
+        //           ),
+        //           duration: Duration(seconds: 4),
+        //         ),
+        //       );
+        //     }
+        //   } catch (e) {
+        //     print("Error occured while starting location sharing: $e");
+        //     ScaffoldMessenger.of(context).showSnackBar(
+        //       SnackBar(content: Text('Failed to start location sharing: $e')),
+        //     );
+        //     // Without interrupting the task status update process.
+        //   }
+        // }
         break;
 
       case 'in_transit':
