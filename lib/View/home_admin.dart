@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/admin/tab/posts_tab.dart';
 import 'package:mobiletesting/admin/tab/products_tab.dart';
-import 'package:mobiletesting/admin/data_analysis.dart';
+import 'package:mobiletesting/admin/business_data.dart';
 import 'package:mobiletesting/admin/settings.dart';
 import 'package:mobiletesting/admin/user_management.dart';
+import 'package:mobiletesting/admin/notifications.dart';
 
 class HomeAdmin extends StatefulWidget {
   const HomeAdmin({super.key});
@@ -55,8 +56,8 @@ class _HomeAdminState extends State<HomeAdmin> {
             label: "User",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: "Data Analysis",
+            icon: Icon(Icons.trending_up),
+            label: "Business",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
@@ -91,8 +92,14 @@ class HomeTabPage extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.notifications, color: Colors.white),
               onPressed: () {
-                Navigator.pushNamed(context, '/notifications');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NotificationsPage(),
+                  ),
+                );
               },
+              tooltip: 'Notifications',
             ),
           ],
           backgroundColor: Colors.teal,
