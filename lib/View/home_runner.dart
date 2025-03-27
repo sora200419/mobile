@@ -8,6 +8,8 @@ import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/View/task_details.dart';
 
+import 'emergency_screen.dart';
+
 class HomeRunner extends StatefulWidget {
   @override
   _HomeRunnerState createState() => _HomeRunnerState();
@@ -78,6 +80,14 @@ class _HomeRunnerState extends State<HomeRunner> {
 
   void _onItemTapped(int index) {
     if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EmergencyScreen(),
+        ),
+      );
+    }
+    else if(index == 2){
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -191,6 +201,7 @@ class _HomeRunnerState extends State<HomeRunner> {
           onTap: _onItemTapped,
           items: [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+            BottomNavigationBarItem(icon: Icon(Icons.warning), label: "Emergency"),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),

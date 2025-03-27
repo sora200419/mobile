@@ -65,13 +65,7 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Poppins',
       ),
       themeMode: ThemeMode.system,
-      home: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          return authProvider.isAuthenticated
-              ? HomeStudent()
-              : const LoginScreen();
-        },
-      ),
+      home: const LoginScreen(),
     );
   }
 }
