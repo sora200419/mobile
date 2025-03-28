@@ -437,7 +437,6 @@ class _ProfileTabState extends State<ProfileTab> {
         }
 
         var achievements = snapshot.data?.docs ?? [];
-
         if (achievements.isEmpty) {
           return Card(
             child: Padding(
@@ -462,40 +461,45 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Show progress toward task master achievement
                   FutureBuilder<int>(
                     future: _getCompletedTasksCount(userId),
                     builder: (context, taskSnapshot) {
                       int completedTasks = taskSnapshot.data ?? 0;
                       double progress =
                           completedTasks / 10; // 10 tasks for task_master
-                      if (progress > 1.0) progress = 1.0;
 
-                      return Column(
-                        children: [
-                          Text(
-                            'Task Master: $completedTasks/10 completed',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 8,
-                            backgroundColor: Colors.grey.shade200,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.amber,
+                      // Only show progress and text if less than or equal to 10 tasks
+                      if (completedTasks <= 10) {
+                        return Column(
+                          children: [
+                            Text(
+                              'Task Master: $completedTasks/10 completed',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Complete ${10 - completedTasks} more tasks to unlock',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                            const SizedBox(height: 8),
+                            LinearProgressIndicator(
+                              value: progress > 1.0 ? 1.0 : progress,
+                              minHeight: 8,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.amber,
+                              ),
                             ),
-                          ),
-                        ],
-                      );
+                            const SizedBox(height: 4),
+                            if (completedTasks < 10)
+                              Text(
+                                'Complete ${10 - completedTasks} more tasks to unlock',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                          ],
+                        );
+                      }
+
+                      // If more than 10 tasks, return an empty widget
+                      return const SizedBox.shrink();
                     },
                   ),
                 ],

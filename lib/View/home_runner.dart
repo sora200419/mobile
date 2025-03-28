@@ -6,7 +6,7 @@ import 'package:mobiletesting/View/status_tag.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
-import 'package:mobiletesting/View/task_details.dart';
+import 'package:mobiletesting/View/runner_task_details.dart';
 
 import 'emergency_screen.dart';
 
@@ -39,7 +39,6 @@ class _HomeRunnerState extends State<HomeRunner> {
     });
   }
 
-
   Future<void> _fetchUserPoints() async {
     setState(() {
       _isLoadingPoints = true;
@@ -47,10 +46,11 @@ class _HomeRunnerState extends State<HomeRunner> {
     User? user = _auth.currentUser;
     if (user != null) {
       try {
-        DocumentSnapshot userSnapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        DocumentSnapshot userSnapshot =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
 
         if (userSnapshot.exists && userSnapshot.data() != null) {
           setState(() {
@@ -82,21 +82,17 @@ class _HomeRunnerState extends State<HomeRunner> {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => EmergencyScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => EmergencyScreen()),
       );
-    }
-    else if(index == 2){
+    } else if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => Scaffold(
-            appBar: AppBar(
-              title: Text("Hi $_username"),
-            ),
-            body: ProfileTab(),
-          ),
+          builder:
+              (context) => Scaffold(
+                appBar: AppBar(title: Text("Hi $_username")),
+                body: ProfileTab(),
+              ),
         ),
       );
     }
@@ -162,12 +158,12 @@ class _HomeRunnerState extends State<HomeRunner> {
                     _isLoadingPoints
                         ? CircularProgressIndicator()
                         : Text(
-                      'My Points: $_userPoints',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange,
-                      ),
-                    ),
+                          'My Points: $_userPoints',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
                   ],
                 ),
               ),
@@ -201,7 +197,10 @@ class _HomeRunnerState extends State<HomeRunner> {
           onTap: _onItemTapped,
           items: [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-            BottomNavigationBarItem(icon: Icon(Icons.warning), label: "Emergency"),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.warning),
+              label: "Emergency",
+            ),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
@@ -227,12 +226,13 @@ class TaskListWidget extends StatelessWidget {
 
         List<Task> tasks = snapshot.data!;
 
-        List<Task> filteredTasks = tasks.where((task) {
-          final lowerCaseQuery = searchQuery.toLowerCase();
-          return task.title.toLowerCase().contains(lowerCaseQuery) ||
-              task.description.toLowerCase().contains(lowerCaseQuery) ||
-              (task.category.toLowerCase().contains(lowerCaseQuery));
-        }).toList();
+        List<Task> filteredTasks =
+            tasks.where((task) {
+              final lowerCaseQuery = searchQuery.toLowerCase();
+              return task.title.toLowerCase().contains(lowerCaseQuery) ||
+                  task.description.toLowerCase().contains(lowerCaseQuery) ||
+                  (task.category.toLowerCase().contains(lowerCaseQuery));
+            }).toList();
 
         if (filteredTasks.isEmpty) {
           return Center(child: Text("No tasks found"));

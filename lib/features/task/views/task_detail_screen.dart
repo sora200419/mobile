@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
-import 'package:mobiletesting/features/task/views/location_tracking_screen.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:mobiletesting/features/task/views/task_rating_screen.dart';
 import 'package:mobiletesting/features/task/services/rating_service.dart';
@@ -36,11 +35,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final TextEditingController _locationController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
+  String? _selectedLocation;
   String _selectedCategory = 'Other';
   int _calculatedRewardPoints = 5; // Default base points
 
   bool _isLoading = false;
-  bool _isLocationTrackingActive = false;
   bool _hasUserRatedTask = false;
 
   // List of task categories
@@ -65,6 +64,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     'Other': 5,
   };
 
+  // List of task locations
+  final List<String> _locations = [
+    'APU Dormitory K1',
+    'APU Satellite Residence',
+    'Parkhill Residence',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +79,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (!widget.isCreating && widget.task != null) {
       _titleController.text = widget.task!.title;
       _descriptionController.text = widget.task!.description;
-      _locationController.text = widget.task!.location;
+      _selectedLocation = widget.task!.location;
       _selectedDate = widget.task!.deadline;
       _selectedCategory = widget.task!.category;
       _calculatedRewardPoints = widget.task!.rewardPoints;
@@ -119,9 +125,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               .once();
 
       if (mounted) {
-        setState(() {
-          _isLocationTrackingActive = event.snapshot.value == true;
-        });
+        setState(() {});
       }
     } catch (e) {
       debugPrint('Error checking tracking status: $e');
@@ -190,7 +194,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _createTask() async {
     if (_titleController.text.isEmpty ||
         _descriptionController.text.isEmpty ||
-        _locationController.text.isEmpty) {
+        _selectedLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in all fields'),
@@ -223,7 +227,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         description: _descriptionController.text,
         requesterId: user.uid,
         requesterName: userName,
-        location: _locationController.text,
+        location: _selectedLocation!, // Use selected location
         rewardPoints: _calculatedRewardPoints,
         deadline: _selectedDate,
         status: 'open',
@@ -439,42 +443,61 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Location field
-          TextField(
-            controller: _locationController,
-            decoration: const InputDecoration(
-              labelText: 'Location',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.location_on),
+          // Location dropdown
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Location',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
+              ),
+              value: _selectedLocation,
+              hint: const Text('Select Location'),
+              items:
+                  _locations.map((String location) {
+                    return DropdownMenuItem<String>(
+                      value: location,
+                      child: Text(location),
+                    );
+                  }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedLocation = newValue;
+                });
+              },
+              validator:
+                  (value) => value == null ? 'Please select a location' : null,
             ),
           ),
-          const SizedBox(height: 16),
 
           // Category dropdown
-          DropdownButtonFormField<String>(
-            value: _selectedCategory,
-            decoration: const InputDecoration(
-              labelText: 'Category',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.category),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: 'Category',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              items:
+                  _categories.map((String category) {
+                    return DropdownMenuItem<String>(
+                      value: category,
+                      child: Text(category),
+                    );
+                  }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedCategory = newValue;
+                  });
+                  _calculateRewardPoints();
+                }
+              },
             ),
-            items:
-                _categories.map((String category) {
-                  return DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedCategory = newValue;
-                });
-                _calculateRewardPoints();
-              }
-            },
           ),
-          const SizedBox(height: 16),
 
           // Deadline date picker
           GestureDetector(
