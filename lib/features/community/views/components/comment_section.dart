@@ -1,7 +1,7 @@
 // lib/features/community/views/components/comment_section.dart
 
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/comment.dart';
+import 'package:mobiletesting/features/community/models/comment_model.dart';
 import 'package:mobiletesting/features/community/services/community_service.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';

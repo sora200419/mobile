@@ -1,7 +1,7 @@
 // lib/features/community/utils/post_utilities.dart
 
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/community_post.dart';
+import 'package:mobiletesting/features/community/models/community_post_model.dart';
 
 class PostUtilities {
   // Get color based on post type

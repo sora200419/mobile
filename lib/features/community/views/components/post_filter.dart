@@ -1,7 +1,7 @@
 // lib/features/community/views/components/post_filter.dart
 
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/community_post.dart';
+import 'package:mobiletesting/features/community/models/community_post_model.dart';
 import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 
 class PostFilter extends StatelessWidget {

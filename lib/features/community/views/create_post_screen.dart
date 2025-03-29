@@ -3,7 +3,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:mobiletesting/features/community/models/community_post.dart';
+import 'package:mobiletesting/features/community/models/community_post_model.dart';
 import 'package:mobiletesting/features/community/services/community_service.dart';
 import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 

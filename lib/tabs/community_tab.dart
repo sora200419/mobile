@@ -1,7 +1,7 @@
 // lib/tabs/community_tab.dart
 
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/community_post.dart';
+import 'package:mobiletesting/features/community/models/community_post_model.dart';
 import 'package:mobiletesting/features/community/services/community_service.dart';
 import 'package:mobiletesting/features/community/views/components/post_card.dart';
 import 'package:mobiletesting/features/community/views/components/post_filter.dart';

@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/community_post.dart';
-import 'package:mobiletesting/features/community/models/comment.dart';
+import 'package:mobiletesting/features/community/models/community_post_model.dart';
+import 'package:mobiletesting/features/community/models/comment_model.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
 import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
 

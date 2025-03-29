@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:mobiletesting/features/community/models/community_post.dart';
+import 'package:mobiletesting/features/community/models/community_post_model.dart';
 import 'package:mobiletesting/features/community/services/community_service.dart';
 import 'package:mobiletesting/features/community/utils/post_utilities.dart';
 import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
