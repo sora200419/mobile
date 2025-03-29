@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/features/task/model/task_model.dart';
 import 'package:mobiletesting/features/task/services/task_service.dart';
-import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
+import 'package:mobiletesting/features/task/views/student_task_detail_screen.dart';
 import 'package:mobiletesting/utils/ui_utils.dart';
 
 class TasksTab extends StatefulWidget {

@@ -1,7 +1,8 @@
+// lib\View\map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 
 import 'package:mobiletesting/features/task/services/location_service.dart';
@@ -30,22 +31,31 @@ class _MapScreenState extends State<MapScreen> {
   Set<Circle> _circles = {};
   bool _initialPositionSet = false;
 
-
   // For current user location
   Location _locationService = Location();
   LocationData? _currentLocation;
 
   // For runner location tracking
-  StreamSubscription<DatabaseEvent>? _runnerLocationSubscription;
+  StreamSubscription<DocumentSnapshot>? _runnerLocationSubscription;
   LatLng? _runnerLocation;
-  bool _showingOwnLocation = false; // Flag to indicate if runner is viewing their own location
+  bool _showingOwnLocation =
+      false; // Flag to indicate if runner is viewing their own location
+  bool _runnerLocationUpdated =
+      false; // Flag to track if runner location was received
 
   // For directions
   Polyline? _directionsPolyline;
 
+  // Timer for auto-timeout
+  Timer? _loadingTimer;
+
   @override
   void initState() {
     super.initState();
+
+    debugPrint(
+      "MapScreen initialized with isStudent=${widget.isStudent}, taskId=${widget.taskId}, runnerId=${widget.runnerId}",
+    );
 
     // Initialize map center with task location if available
     if (widget.taskLocation != null) {
@@ -56,20 +66,36 @@ class _MapScreenState extends State<MapScreen> {
     // Get current location of the device
     _getCurrentLocation();
 
-    // If student view or if runner wants to see their own location, start tracking runner's location
-    if ((widget.isStudent || !widget.isStudent) && widget.taskId != null) {
+    // Start tracking runner's location if we have a task ID
+    if (widget.taskId != null) {
+      debugPrint("Starting to track runner location for task ${widget.taskId}");
       _startTrackingRunnerLocation();
 
       // If this is a runner viewing their own location
       if (!widget.isStudent && widget.runnerId != null) {
         _showingOwnLocation = true;
+        debugPrint("Runner is viewing their own location");
       }
+    }
+
+    // Set up a timeout for loading indicator
+    if (widget.isStudent) {
+      _loadingTimer = Timer(Duration(seconds: 15), () {
+        if (mounted && !_runnerLocationUpdated) {
+          setState(() {
+            // Force show map even if no location yet
+            _runnerLocationUpdated = true;
+            debugPrint("Auto-timeout triggered for loading indicator");
+          });
+        }
+      });
     }
   }
 
   @override
   void dispose() {
     _runnerLocationSubscription?.cancel();
+    _loadingTimer?.cancel();
     super.dispose();
   }
 
@@ -83,13 +109,16 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _markers.add(
           Marker(
-            markerId: MarkerId('task_location'),
+            markerId: const MarkerId('task_location'),
             position: widget.taskLocation!,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(title: 'Task Location'),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueRed,
+            ),
+            infoWindow: const InfoWindow(title: 'Task Location'),
           ),
         );
       });
+      debugPrint("Added task marker at ${widget.taskLocation}");
     }
   }
 
@@ -103,6 +132,7 @@ class _MapScreenState extends State<MapScreen> {
     if (!_serviceEnabled) {
       _serviceEnabled = await _locationService.requestService();
       if (!_serviceEnabled) {
+        debugPrint("Location service not enabled by user");
         return;
       }
     }
@@ -112,6 +142,7 @@ class _MapScreenState extends State<MapScreen> {
     if (_permissionGranted == PermissionStatus.denied) {
       _permissionGranted = await _locationService.requestPermission();
       if (_permissionGranted != PermissionStatus.granted) {
+        debugPrint("Location permission not granted by user");
         return;
       }
     }
@@ -119,17 +150,19 @@ class _MapScreenState extends State<MapScreen> {
     // Get current location
     _currentLocation = await _locationService.getLocation();
 
-    if (_currentLocation != null) {
+    if (_currentLocation != null && mounted) {
       setState(() {
         // Add blue circle for user's current location
         _updateUserLocationCircle();
 
         // If we're a runner and no task location, center on current location
         if (!widget.isStudent && widget.taskLocation == null) {
-          _center = LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!);
-          mapController.animateCamera(
-            CameraUpdate.newLatLng(_center),
+          _center = LatLng(
+            _currentLocation!.latitude!,
+            _currentLocation!.longitude!,
           );
+          mapController.animateCamera(CameraUpdate.newLatLng(_center));
+          debugPrint("Centered map on runner's current location: $_center");
         }
       });
     }
@@ -175,75 +208,185 @@ class _MapScreenState extends State<MapScreen> {
         // Update circles
         _circles = {..._circles}; // create new collection
         _circles.removeWhere(
-              (circle) => circle.circleId.value == 'user_location',
+          (circle) => circle.circleId.value == 'user_location',
         );
         _circles.add(userLocationCircle);
 
         // update markers
         _markers = {..._markers}; // create new collection
         _markers.removeWhere(
-              (marker) => marker.markerId.value == 'current_user_marker',
+          (marker) => marker.markerId.value == 'current_user_marker',
         );
         _markers.add(userLocationMarker);
       });
 
       // if the initial position has not set, set the center of map to current location
-      if (!_initialPositionSet) {
-        mapController.animateCamera(CameraUpdate.newLatLng(
-            LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!)
-        ));
+      if (!_initialPositionSet && !widget.isStudent) {
+        mapController.animateCamera(
+          CameraUpdate.newLatLng(
+            LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+          ),
+        );
         _initialPositionSet = true;
+        debugPrint("Set initial map position to user's location");
       }
     }
   }
 
-  // Start tracking runner location from Firebase
+  // Start tracking runner location from Firestore - MODIFIED
   void _startTrackingRunnerLocation() {
-    final databaseRef = FirebaseDatabase.instance.ref('taskLocations/${widget.taskId}');
+    if (widget.taskId == null) {
+      debugPrint("Cannot track location: No task ID provided");
+      return;
+    }
 
-    _runnerLocationSubscription = databaseRef.onValue.listen((DatabaseEvent event) {
-      if (event.snapshot.value != null) {
-        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+    // For student view, verify tracking status and show appropriate feedback
+    if (widget.isStudent) {
+      debugPrint("Student view: Checking runner location tracking status");
 
-        final latitude = data['latitude'] as double?;
-        final longitude = data['longitude'] as double?;
+      // Check if tracking is active
+      RunnerLocationService.isTrackingActive(widget.taskId!)
+          .then((isActive) {
+            debugPrint(
+              "Runner tracking status: ${isActive ? 'ACTIVE' : 'INACTIVE'}",
+            );
 
-        if (latitude != null && longitude != null) {
-          setState(() {
-            _runnerLocation = LatLng(latitude, longitude);
-            _updateRunnerMarker();
+            if (!isActive && mounted) {
+              // Show a more informative message if tracking isn't active
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Runner has not started sharing location yet. ' +
+                        'Wait for runner to begin their delivery.',
+                  ),
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          })
+          .catchError((error) {
+            debugPrint("Error checking if tracking is active: $error");
           });
+    }
+
+    // Set up the Firestore reference for location updates
+    final firestoreRef = FirebaseFirestore.instance
+        .collection('taskLocations')
+        .doc(widget.taskId);
+
+    debugPrint(
+      "Subscribing to Firestore document: taskLocations/${widget.taskId}",
+    );
+
+    // Add a one-time check to see if data exists already
+    firestoreRef.get().then((snapshot) {
+      if (snapshot.exists) {
+        debugPrint("Found existing location data in Firestore");
+        // If data exists, try to initialize immediately
+        try {
+          final data = snapshot.data() as Map<String, dynamic>;
+          final latitude = data['latitude'] as double?;
+          final longitude = data['longitude'] as double?;
+
+          if (latitude != null && longitude != null && mounted) {
+            setState(() {
+              _runnerLocation = LatLng(latitude, longitude);
+              _runnerLocationUpdated = true;
+              _updateRunnerMarker();
+
+              // Center map on runner's location for student view
+              if (widget.isStudent) {
+                mapController.animateCamera(
+                  CameraUpdate.newLatLngZoom(LatLng(latitude, longitude), 15.0),
+                );
+                _initialPositionSet = true;
+                debugPrint("Centered student view on existing runner location");
+              }
+            });
+          }
+        } catch (e) {
+          debugPrint("Error processing existing location data: $e");
         }
+      } else {
+        debugPrint("No existing location data found in Firestore");
       }
-    }, onError: (error) {
-      debugPrint('Error tracking runner location: $error');
     });
+
+    // Subscribe to real-time updates using Firestore snapshots
+    _runnerLocationSubscription = firestoreRef.snapshots().listen(
+      (snapshot) {
+        debugPrint(
+          "Received location update from Firestore: ${snapshot.exists}",
+        );
+        if (snapshot.exists && snapshot.data() != null) {
+          try {
+            final data = snapshot.data() as Map<String, dynamic>;
+            final latitude = data['latitude'] as double?;
+            final longitude = data['longitude'] as double?;
+
+            if (latitude != null && longitude != null) {
+              debugPrint("Runner location updated: $latitude, $longitude");
+              if (mounted) {
+                setState(() {
+                  _runnerLocation = LatLng(latitude, longitude);
+                  _runnerLocationUpdated = true;
+                  _updateRunnerMarker();
+
+                  // For student view, center on runner's location when it's first received
+                  if (widget.isStudent && !_initialPositionSet) {
+                    mapController.animateCamera(
+                      CameraUpdate.newLatLngZoom(
+                        LatLng(latitude, longitude),
+                        15.0,
+                      ),
+                    );
+                    _initialPositionSet = true;
+                    debugPrint("Centered student view on runner's location");
+                  }
+                });
+              }
+            }
+          } catch (e) {
+            debugPrint("Error processing location data: $e");
+          }
+        } else {
+          debugPrint("No location data received from Firestore");
+        }
+      },
+      onError: (error) {
+        debugPrint('Error tracking runner location: $error');
+      },
+    );
   }
 
   // Update marker for runner location
   void _updateRunnerMarker() {
     if (_runnerLocation != null) {
       setState(() {
-        _markers.removeWhere((marker) => marker.markerId.value == 'runner_location');
+        _markers.removeWhere(
+          (marker) => marker.markerId.value == 'runner_location',
+        );
         _markers.add(
           Marker(
-            markerId: MarkerId('runner_location'),
+            markerId: const MarkerId('runner_location'),
             position: _runnerLocation!,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueGreen,
+            ),
             infoWindow: InfoWindow(
-                title: _showingOwnLocation ? 'Your Location' : 'Runner Location'
+              title: _showingOwnLocation ? 'Your Location' : 'Runner Location',
             ),
           ),
         );
+        debugPrint("Updated runner marker at $_runnerLocation");
       });
     }
   }
 
   // Center map on specific location
   void _centerMapOn(LatLng location) {
-    mapController.animateCamera(
-      CameraUpdate.newLatLng(location),
-    );
+    mapController.animateCamera(CameraUpdate.newLatLng(location));
+    debugPrint("Centered map on location: $location");
   }
 
   // Build floating action buttons
@@ -254,13 +397,12 @@ class _MapScreenState extends State<MapScreen> {
     buttons.add(
       FloatingActionButton(
         heroTag: 'btn_my_location',
-        child: Icon(Icons.my_location),
+        child: const Icon(Icons.my_location),
         onPressed: () {
           if (_currentLocation != null) {
-            _centerMapOn(LatLng(
-                _currentLocation!.latitude!,
-                _currentLocation!.longitude!
-            ));
+            _centerMapOn(
+              LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+            );
           }
         },
       ),
@@ -274,11 +416,14 @@ class _MapScreenState extends State<MapScreen> {
           child: FloatingActionButton(
             heroTag: 'btn_runner_location',
             backgroundColor: Colors.green,
-            child: Icon(Icons.person_pin_circle),
+            child: const Icon(Icons.person_pin_circle),
             onPressed: () {
               _centerMapOn(_runnerLocation!);
             },
-            tooltip: _showingOwnLocation ? 'Your shared location' : 'Runner location',
+            tooltip:
+                _showingOwnLocation
+                    ? 'Your shared location'
+                    : 'Runner location',
           ),
         ),
       );
@@ -292,7 +437,7 @@ class _MapScreenState extends State<MapScreen> {
           child: FloatingActionButton(
             heroTag: 'btn_task_location',
             backgroundColor: Colors.red,
-            child: Icon(Icons.place),
+            child: const Icon(Icons.place),
             onPressed: () {
               _centerMapOn(widget.taskLocation!);
             },
@@ -308,23 +453,56 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isStudent ? 'Runner Location' : 'Task & Runner Location'),
+        title: Text(
+          widget.isStudent ? 'Runner Location' : 'Task & Runner Location',
+        ),
         actions: [
-          if (!widget.isStudent && widget.taskId != null && widget.runnerId != null)
+          if (!widget.isStudent &&
+              widget.taskId != null &&
+              widget.runnerId != null)
             IconButton(
-              icon: Icon(Icons.share_location),
+              icon: const Icon(Icons.share_location),
               onPressed: () => _toggleLocationSharing(context),
             ),
         ],
       ),
-      body: GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(target: _center, zoom: 15.0),
-        markers: _markers,
-        circles: _circles,
-        polylines: _directionsPolyline != null ? {_directionsPolyline!} : {},
-        myLocationEnabled: false, // Using custom blue dot
-        myLocationButtonEnabled: false,
+      body: Stack(
+        children: [
+          // Always show the map
+          GoogleMap(
+            onMapCreated: _onMapCreated,
+            initialCameraPosition: CameraPosition(target: _center, zoom: 15.0),
+            markers: _markers,
+            circles: _circles,
+            polylines:
+                _directionsPolyline != null ? {_directionsPolyline!} : {},
+            myLocationEnabled: false, // Using custom blue dot
+            myLocationButtonEnabled: false,
+          ),
+
+          // Show loading indicator if student view and no runner location yet
+          if (widget.isStudent && !_runnerLocationUpdated)
+            Center(
+              child: Card(
+                elevation: 4.0,
+                color: Colors.white.withOpacity(0.9),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text(
+                        "Waiting for runner location updates...",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -345,7 +523,7 @@ class _MapScreenState extends State<MapScreen> {
         final locationService = RunnerLocationService(widget.runnerId!);
         await locationService.stopSharingLocation(widget.taskId!);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location sharing stopped')),
+          const SnackBar(content: Text('Location sharing stopped')),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -358,7 +536,7 @@ class _MapScreenState extends State<MapScreen> {
         final locationService = RunnerLocationService(widget.runnerId!);
         await locationService.startSharingLocation(widget.taskId!, context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location sharing started')),
+          const SnackBar(content: Text('Location sharing started')),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(

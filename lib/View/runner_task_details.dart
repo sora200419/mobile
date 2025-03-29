@@ -1,3 +1,4 @@
+//lib\View\runner_task_details.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/status_tag.dart';
@@ -366,48 +367,66 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
           print("Error: User not logged in.");
         }
         return; // Update providerId and providerName when the status is 'open' only
+
       case 'assigned':
         newStatus = 'in_transit';
 
-        // Location sharing feature (currently disabled)
-        // // When the status updates from "assigned" to "in_transit," automatically start location sharing
+        // When status changes from "assigned" to "in_transit"
+        final FirebaseAuth auth = FirebaseAuth.instance;
+        final User? user = auth.currentUser;
+        if (user != null) {
+          // Show a progress indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Starting location sharing...')),
+          );
 
-        // final FirebaseAuth auth = FirebaseAuth.instance;
-        // final User? user = auth.currentUser;
-        // if (user != null) {
-        //   // Start location sharing
-        //   try {
-        //     final locationService = RunnerLocationService(user.uid);
-        //     bool success = await locationService.startSharingLocation(
-        //       taskId,
-        //       context,
-        //     );
-        //     if (success) {
-        //       ScaffoldMessenger.of(context).showSnackBar(
-        //         SnackBar(
-        //           content: Text(
-        //             'Location sharing has been automatically started.',
-        //           ),
-        //         ),
-        //       );
-        //     } else {
-        //       ScaffoldMessenger.of(context).showSnackBar(
-        //         SnackBar(
-        //           content: Text(
-        //             'Failed to start location sharing. Please enable location sharing manually.',
-        //           ),
-        //           duration: Duration(seconds: 4),
-        //         ),
-        //       );
-        //     }
-        //   } catch (e) {
-        //     print("Error occured while starting location sharing: $e");
-        //     ScaffoldMessenger.of(context).showSnackBar(
-        //       SnackBar(content: Text('Failed to start location sharing: $e')),
-        //     );
-        //     // Without interrupting the task status update process.
-        //   }
-        // }
+          // Start location sharing using Firestore
+          try {
+            final locationService = RunnerLocationService(user.uid);
+            bool success = await locationService.startSharingLocation(
+              taskId,
+              context,
+            );
+
+            if (success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Location sharing started successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              // If it fails, show a more detailed error
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Location sharing failed. Please check your location permissions.',
+                  ),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'RETRY',
+                    onPressed: () async {
+                      // Manually try to start location sharing again
+                      await locationService.startSharingLocation(
+                        taskId,
+                        context,
+                      );
+                    },
+                  ),
+                ),
+              );
+            }
+          } catch (e) {
+            print("Error starting location sharing: $e");
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error starting location sharing: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
         break;
 
       case 'in_transit':
@@ -430,11 +449,11 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                 ),
               );
             } catch (e) {
-              print("Error occured while stopping location sharing: $e");
+              print("Error occurred while stopping location sharing: $e");
               // Without interrupting the task completion process
             }
 
-            // 更新用户积分
+            // Update user points
             DocumentSnapshot userDoc =
                 await FirebaseFirestore.instance
                     .collection('users')
@@ -455,7 +474,7 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
               print('User document not found.');
             }
 
-            // update task status
+            // Update task status
             await FirebaseFirestore.instance
                 .collection('tasks')
                 .doc(taskId)

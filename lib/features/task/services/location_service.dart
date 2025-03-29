@@ -1,11 +1,11 @@
 // lib/features/task/services/location_service.dart
 
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:location/location.dart';
 import 'package:flutter/material.dart';
 
 class RunnerLocationService {
-  final FirebaseDatabase _database = FirebaseDatabase.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _runnerId;
   Location _location = Location();
   bool _isTrackingEnabled = false;
@@ -83,36 +83,74 @@ class RunnerLocationService {
 
     if (_isTrackingEnabled) {
       debugPrint('Already tracking, returning true');
-      return true; // Already tracking
+      return true;
     }
 
     try {
-      debugPrint('Re-initializing location service to ensure permissions');
-      await _initializeLocationService();
+      // Request runtime permissions explicitly
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
+          debugPrint('Location service not enabled, cannot track');
+          if (context != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location services must be enabled for tracking'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return false;
+        }
+      }
 
+      // Request permission with clear message
+      PermissionStatus permission = await _location.hasPermission();
+      if (permission == PermissionStatus.denied) {
+        permission = await _location.requestPermission();
+        if (permission != PermissionStatus.granted) {
+          debugPrint('Location permission denied');
+          if (context != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission is required for tracking'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return false;
+        }
+      }
+
+      // Try to enable background mode multiple times if needed
       debugPrint('Enabling background mode');
-      bool backgroundEnabled = await _location.enableBackgroundMode(
-        enable: true,
-      );
+      bool backgroundEnabled = false;
+      for (int i = 0; i < 3; i++) {
+        backgroundEnabled = await _location.enableBackgroundMode(enable: true);
+        if (backgroundEnabled) break;
+        await Future.delayed(Duration(milliseconds: 500));
+      }
+
       if (!backgroundEnabled) {
         debugPrint('Failed to enable background mode');
         if (context != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Background location permission required for tracking',
+                'Background location permission required for tracking. Please enable it in app settings.',
               ),
               duration: Duration(seconds: 4),
             ),
           );
         }
-      } else {
-        debugPrint('Background mode enabled successfully');
       }
 
+      // Set tracking to enabled even if background mode fails
+      // This allows foreground tracking to work
       _isTrackingEnabled = true;
 
-      // Get initial location and update database
+      // Get initial location and update Firestore
       debugPrint('Getting current location');
       LocationData currentLocation = await _location.getLocation();
       debugPrint(
@@ -120,8 +158,8 @@ class RunnerLocationService {
         'lng=${currentLocation.longitude}',
       );
 
-      debugPrint('Updating initial location in database');
-      await _updateLocationInDatabase(taskId, currentLocation);
+      debugPrint('Updating initial location in Firestore');
+      await _updateLocationInFirestore(taskId, currentLocation);
 
       // Start location updates subscription
       debugPrint('Starting location change listener');
@@ -131,16 +169,16 @@ class RunnerLocationService {
           'lat=${locationData.latitude}, lng=${locationData.longitude}',
         );
         if (_isTrackingEnabled) {
-          _updateLocationInDatabase(taskId, locationData);
+          _updateLocationInFirestore(taskId, locationData);
         }
       });
 
-      // Create tracking status in database
-      debugPrint('Setting tracking status in database');
-      await _database.ref('taskTracking/$taskId').set({
+      // Create tracking status in Firestore
+      debugPrint('Setting tracking status in Firestore');
+      await _firestore.collection('taskTracking').doc(taskId).set({
         'active': true,
         'runnerId': _runnerId,
-        'startedAt': ServerValue.timestamp,
+        'startedAt': FieldValue.serverTimestamp(),
       });
 
       debugPrint('Location tracking started successfully for task $taskId');
@@ -170,11 +208,11 @@ class RunnerLocationService {
       debugPrint('Disabling background mode');
       await _location.enableBackgroundMode(enable: false);
 
-      // Update tracking status in database
-      debugPrint('Updating tracking status in database');
-      await _database.ref('taskTracking/$taskId').update({
+      // Update tracking status in Firestore
+      debugPrint('Updating tracking status in Firestore');
+      await _firestore.collection('taskTracking').doc(taskId).update({
         'active': false,
-        'endedAt': ServerValue.timestamp,
+        'endedAt': FieldValue.serverTimestamp(),
       });
 
       debugPrint('Location tracking stopped for task $taskId');
@@ -184,8 +222,8 @@ class RunnerLocationService {
     }
   }
 
-  // Update location in Firebase
-  Future<void> _updateLocationInDatabase(
+  // Update location in Firestore
+  Future<void> _updateLocationInFirestore(
     String taskId,
     LocationData locationData,
   ) async {
@@ -196,38 +234,87 @@ class RunnerLocationService {
       }
 
       debugPrint(
-        'Updating location in database for task $taskId: '
+        'Updating location in Firestore for task $taskId: '
         'lat=${locationData.latitude}, lng=${locationData.longitude}',
       );
 
-      await _database.ref('taskLocations/$taskId').set({
+      await _firestore.collection('taskLocations').doc(taskId).set({
         'latitude': locationData.latitude,
         'longitude': locationData.longitude,
         'heading': locationData.heading,
         'speed': locationData.speed,
         'accuracy': locationData.accuracy,
-        'timestamp': ServerValue.timestamp,
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       debugPrint('Location updated successfully');
     } catch (e) {
-      debugPrint('Error updating location in database: $e');
+      debugPrint('Error updating location in Firestore: $e');
     }
   }
 
   // Get current tracking status
   bool get isTracking => _isTrackingEnabled;
 
+  Future<bool> checkLocationServices(BuildContext? context) async {
+    debugPrint('Checking if location services are available');
+
+    // Check if location service is enabled
+    bool serviceEnabled = await _location.serviceEnabled();
+    if (!serviceEnabled) {
+      debugPrint('Location service is not enabled, requesting...');
+      serviceEnabled = await _location.requestService();
+      if (!serviceEnabled) {
+        debugPrint('User denied enabling location service');
+        if (context != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location services must be enabled for tracking'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return false;
+      }
+    }
+
+    // Check permissions
+    PermissionStatus permissionGranted = await _location.hasPermission();
+    if (permissionGranted == PermissionStatus.denied) {
+      debugPrint('Location permission denied, requesting...');
+      permissionGranted = await _location.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) {
+        debugPrint('User denied location permission');
+        if (context != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission is required for tracking'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   // Check if tracking is active for a task
   static Future<bool> isTrackingActive(String taskId) async {
     try {
       debugPrint('Checking if tracking is active for task: $taskId');
-      DatabaseEvent event =
-          await FirebaseDatabase.instance
-              .ref('taskTracking/$taskId/active')
-              .once();
+      DocumentSnapshot snapshot =
+          await FirebaseFirestore.instance
+              .collection('taskTracking')
+              .doc(taskId)
+              .get();
 
-      bool isActive = event.snapshot.value == true;
+      bool isActive =
+          snapshot.exists &&
+          snapshot.data() != null &&
+          (snapshot.data() as Map<String, dynamic>)['active'] == true;
+
       debugPrint('Tracking status for task $taskId: $isActive');
       return isActive;
     } catch (e) {
@@ -240,10 +327,10 @@ class RunnerLocationService {
   static Future<void> resetTrackingStatus(String taskId) async {
     try {
       debugPrint('MANUAL RESET: Resetting tracking status for task: $taskId');
-      await FirebaseDatabase.instance.ref('taskTracking/$taskId').set({
-        'active': false,
-        'resetAt': ServerValue.timestamp,
-      });
+      await FirebaseFirestore.instance
+          .collection('taskTracking')
+          .doc(taskId)
+          .set({'active': false, 'resetAt': FieldValue.serverTimestamp()});
       debugPrint('Tracking status reset complete');
     } catch (e) {
       debugPrint('Error resetting tracking status: $e');

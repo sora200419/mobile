@@ -6,7 +6,7 @@ import 'package:mobiletesting/features/gamification/models/user_progress_model.d
 import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
-import 'package:mobiletesting/features/task/views/task_detail_screen.dart';
+import 'package:mobiletesting/features/task/views/student_task_detail_screen.dart';
 import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
 import 'package:mobiletesting/features/community/views/create_post_screen.dart';
 

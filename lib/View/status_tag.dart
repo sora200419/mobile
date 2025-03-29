@@ -1,3 +1,4 @@
+//lib\View\status_tag.dart
 import 'package:flutter/material.dart';
 
 class StatusTag extends StatelessWidget {
@@ -55,18 +56,11 @@ class StatusTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: textColor,
-            size: 16,
-          ),
+          Icon(icon, color: textColor, size: 16),
           SizedBox(width: 4),
           Text(
             status.toUpperCase(),
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
           ),
         ],
       ),

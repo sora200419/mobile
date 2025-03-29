@@ -1,3 +1,4 @@
+//lib\features\task\views\student_task_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,11 +8,14 @@ import 'package:mobiletesting/features/task/services/task_service.dart';
 import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
 import 'package:mobiletesting/features/task/views/task_rating_screen.dart';
 import 'package:mobiletesting/features/task/services/rating_service.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import 'package:mobiletesting/services/auth_provider.dart';
 import 'package:mobiletesting/utils/ui_utils.dart';
 import 'package:mobiletesting/utils/formatting_utils.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:mobiletesting/View/map_screen.dart';
+import 'package:mobiletesting/features/task/services/location_service.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final bool isCreating;
@@ -19,7 +23,6 @@ class TaskDetailScreen extends StatefulWidget {
 
   const TaskDetailScreen({Key? key, required this.isCreating, this.task})
     : super(key: key);
-
   @override
   State<TaskDetailScreen> createState() => _TaskDetailScreenState();
 }
@@ -41,6 +44,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   bool _isLoading = false;
   bool _hasUserRatedTask = false;
+
+  // Location related variables
+  LatLng? _taskLocation;
+  bool _isLoadingLocation = true;
 
   // List of task categories
   final List<String> _categories = [
@@ -84,10 +91,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _selectedCategory = widget.task!.category;
       _calculatedRewardPoints = widget.task!.rewardPoints;
 
-      // Check if location tracking is active for this task
-      if (widget.task!.status == 'in_transit') {
-        _checkLocationTrackingStatus();
-      }
+      // Load location coordinates
+      _loadLocation();
 
       // Check if user has already rated this task
       if (widget.task!.status == 'completed' && widget.task!.id != null) {
@@ -96,6 +101,127 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     } else {
       // For new tasks, calculate initial points
       _calculateRewardPoints();
+    }
+  }
+
+  Future<void> _loadLocation() async {
+    debugPrint('Attempting to load location for: ${widget.task!.location}');
+    if (widget.task!.latLng != null) {
+      debugPrint('Location already has LatLng: ${widget.task!.latLng}');
+      setState(() {
+        _taskLocation = widget.task!.latLng;
+        _isLoadingLocation = false;
+      });
+    } else if (widget.task!.location.isNotEmpty) {
+      try {
+        debugPrint('Performing geocoding for: ${widget.task!.location}');
+        List<Location> locations = await locationFromAddress(
+          widget.task!.location,
+        );
+        debugPrint('Geocoding results: $locations');
+        if (locations.isNotEmpty) {
+          setState(() {
+            _taskLocation = LatLng(
+              locations.first.latitude,
+              locations.first.longitude,
+            );
+            _isLoadingLocation = false;
+          });
+          debugPrint('Successfully geocoded to: $_taskLocation');
+        } else {
+          debugPrint(
+            'Unable to find the latitude and longitude for this address: ${widget.task!.location}',
+          );
+          setState(() {
+            _isLoadingLocation = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Geocoding error: $e');
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoadingLocation = false;
+        debugPrint('Location string is empty.');
+      });
+    }
+  }
+
+  // Method to handle map navigation - MODIFIED
+  void _viewOnMap() {
+    // Get current user id
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You need to be logged in to view the map'),
+        ),
+      );
+      return;
+    }
+
+    // Check if location is still loading
+    if (_isLoadingLocation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Location is still loading. Please try again in a moment.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Check if location is available
+    if (_taskLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to locate this address. Please check the location details.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Determine if this is a student or runner view
+    final bool isStudent = widget.task!.requesterId == currentUser.uid;
+
+    // Simplify logic - for students with assigned tasks, always enable tracking
+    if (isStudent &&
+        (widget.task!.status == 'assigned' ||
+            widget.task!.status == 'in_transit') &&
+        widget.task!.providerId != null) {
+      // Navigate to map screen with tracking parameters
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => MapScreen(
+                taskLocation: _taskLocation,
+                taskId: widget.task!.id,
+                runnerId: widget.task!.providerId,
+                isStudent: true, // Force student view
+              ),
+        ),
+      );
+    } else {
+      // Otherwise just show task location
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => MapScreen(
+                taskLocation: _taskLocation,
+                taskId: widget.task!.id,
+                runnerId: widget.task!.providerId,
+                isStudent: isStudent,
+              ),
+        ),
+      );
     }
   }
 
@@ -112,23 +238,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error checking if user has rated task: $e');
-    }
-  }
-
-  Future<void> _checkLocationTrackingStatus() async {
-    if (widget.task == null || widget.task!.id == null) return;
-
-    try {
-      DatabaseEvent event =
-          await FirebaseDatabase.instance
-              .ref('taskTracking/${widget.task!.id}/active')
-              .once();
-
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      debugPrint('Error checking tracking status: $e');
     }
   }
 
@@ -296,12 +405,61 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     try {
       await _taskService.markTaskInTransit(widget.task!.id!);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Task marked as in transit'),
-          backgroundColor: Colors.blue,
-        ),
-      );
+      // When status changes from "assigned" to "in_transit"
+      final User? user = _auth.currentUser;
+      if (user != null) {
+        // Show a progress indicator
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Starting location sharing...')),
+        );
+
+        // Start location sharing using Firestore
+        try {
+          final locationService = RunnerLocationService(user.uid);
+          bool success = await locationService.startSharingLocation(
+            widget.task!.id!,
+            context,
+          );
+
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location sharing started successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            // If it fails, show a more detailed error
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text(
+                  'Location sharing failed. Please check your location permissions.',
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'RETRY',
+                  onPressed: () async {
+                    // Manually try to start location sharing again
+                    await locationService.startSharingLocation(
+                      widget.task!.id!,
+                      context,
+                    );
+                  },
+                ),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint("Error starting location sharing: $e");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error starting location sharing: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
 
       // Refresh page
       Navigator.pop(context);
@@ -316,7 +474,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
-  // Complete a task
+  // Inside the _completeTask() method:
   Future<void> _completeTask() async {
     setState(() {
       _isLoading = true;
@@ -324,6 +482,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     try {
       await _taskService.completeTask(widget.task!.id!);
+
+      // Stop location sharing
+      final User? user = _auth.currentUser;
+      if (user != null) {
+        try {
+          final locationService = RunnerLocationService(user.uid);
+          await locationService.stopSharingLocation(widget.task!.id!);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location sharing has been automatically stopped.'),
+            ),
+          );
+        } catch (e) {
+          debugPrint("Error occurred while stopping location sharing: $e");
+          // Without interrupting the task completion process
+        }
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -344,6 +519,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       });
     }
   }
+
+  // Inside the _viewOnMap() method:
 
   // Navigate to rating screen
   void _navigateToRatingScreen(String userIdToRate, String userNameToRate) {
@@ -624,6 +801,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final bool isCompleted = task.status == 'completed';
     final bool canRate = isCompleted && isRequester && !_hasUserRatedTask;
 
+    // Map visibility logic - show map button if location exists or task has a runner
+    final bool canViewMap = task.location.isNotEmpty;
+
     // Define who to rate - students can only rate runners, not the other way around
     String? userIdToRate;
     String? userNameToRate;
@@ -759,6 +939,56 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ],
             ),
 
+          // View on Map button - MODIFIED to include tracking automatically
+          if (canViewMap)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _viewOnMap,
+                icon:
+                    isRequester &&
+                            (task.status == 'assigned' ||
+                                task.status == 'in_transit') &&
+                            task.providerId != null
+                        ? const Icon(
+                          Icons.person_pin_circle,
+                        ) // Show tracking icon for students when runner assigned
+                        : const Icon(
+                          Icons.map,
+                        ), // Show regular map icon otherwise
+                label:
+                    isRequester &&
+                            (task.status == 'assigned' ||
+                                task.status == 'in_transit') &&
+                            task.providerId != null
+                        ? const Text(
+                          'View & Track on Map',
+                        ) // Change label for tracking
+                        : const Text('View on Map'), // Regular label
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      isRequester &&
+                              (task.status == 'assigned' ||
+                                  task.status == 'in_transit') &&
+                              task.providerId != null
+                          ? Colors.green[50] // Green background for tracking
+                          : Colors.blue[50], // Blue background otherwise
+                  foregroundColor:
+                      isRequester &&
+                              (task.status == 'assigned' ||
+                                  task.status == 'in_transit') &&
+                              task.providerId != null
+                          ? Colors.green[800] // Green text for tracking
+                          : null, // Default text color otherwise
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 16),
 
@@ -835,39 +1065,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
 
-          // Location tracking button for in_transit tasks
-          // if (task.status == 'in_transit' && task.id != null)
-          //   Column(
-          //     children: [
-          //       const SizedBox(height: 16),
-          //       SizedBox(
-          //         width: double.infinity,
-          //         child: ElevatedButton.icon(
-          //           icon: const Icon(Icons.map),
-          //           label: const Text('Track Runner Location'),
-          //           style: ElevatedButton.styleFrom(
-          //             backgroundColor: Colors.blue,
-          //             padding: const EdgeInsets.symmetric(vertical: 12),
-          //           ),
-          //           onPressed: () {
-          //             Navigator.push(
-          //               context,
-          //               MaterialPageRoute(
-          //                 builder:
-          //                     (context) => LocationTrackingScreen(
-          //                       task: task,
-          //                       isStudent: isRequester,
-          //                     ),
-          //               ),
-          //             );
-          //           },
-          //         ),
-          //       ),
-          //       const SizedBox(height: 16),
-          //     ],
-          //   ),
-
-          // Action buttons row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -918,7 +1115,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     () =>
                         _navigateToRatingScreen(userIdToRate!, userNameToRate!),
                 icon: const Icon(Icons.star),
-                label: Text('Rate Runner'),
+                label: const Text('Rate Runner'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber,
                   padding: const EdgeInsets.symmetric(vertical: 12),
