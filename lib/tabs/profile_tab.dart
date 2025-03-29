@@ -613,23 +613,6 @@ class _ProfileTabState extends State<ProfileTab> {
     return points[achievementId] ?? 0;
   }
 
-  // Helper methods for profile stats
-  Future<String> _getCompletedTasksCount(String userId) async {
-    try {
-      QuerySnapshot completedTasksSnapshot =
-          await FirebaseFirestore.instance
-              .collection('tasks')
-              .where('providerId', isEqualTo: userId)
-              .where('status', isEqualTo: 'completed')
-              .get();
-
-      return completedTasksSnapshot.docs.length.toString();
-    } catch (e) {
-      print('Error getting completed tasks count: $e');
-      return '0';
-    }
-  }
-
   Future<String> _getCurrentLoginStreak(String userId) async {
     try {
       DocumentSnapshot streakDoc =
