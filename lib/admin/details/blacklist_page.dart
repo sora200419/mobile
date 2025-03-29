@@ -9,9 +9,8 @@ class BlacklistPage extends StatefulWidget {
 
 class _BlacklistPageState extends State<BlacklistPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  bool _isAscending = true; 
-  String? _selectedRole; 
-
+  bool _isAscending = true;
+  String? _selectedRole;
 
   IconData _getRoleIcon(String role) {
     switch (role) {
@@ -66,7 +65,7 @@ class _BlacklistPageState extends State<BlacklistPage> {
                     ],
                     onChanged: (value) {
                       setState(() {
-                        _selectedRole = value; 
+                        _selectedRole = value;
                       });
                     },
                     decoration: InputDecoration(
@@ -75,12 +74,14 @@ class _BlacklistPageState extends State<BlacklistPage> {
                     ),
                   ),
                 ),
-                SizedBox(width: 10), 
+                SizedBox(width: 10),
                 IconButton(
-                  icon: Icon(_isAscending ? Icons.arrow_upward : Icons.arrow_downward),
+                  icon: Icon(
+                    _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                  ),
                   onPressed: () {
                     setState(() {
-                      _isAscending = !_isAscending; 
+                      _isAscending = !_isAscending;
                     });
                   },
                 ),
@@ -90,10 +91,11 @@ class _BlacklistPageState extends State<BlacklistPage> {
           // user list
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('users')
-                  .where('isBanned', isEqualTo: true)
-                  .snapshots(),
+              stream:
+                  _firestore
+                      .collection('users')
+                      .where('isBanned', isEqualTo: true)
+                      .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator());
@@ -106,9 +108,10 @@ class _BlacklistPageState extends State<BlacklistPage> {
 
                 // filter by role
                 if (_selectedRole != null) {
-                  bannedUsers = bannedUsers
-                      .where((doc) => doc['role'] == _selectedRole)
-                      .toList();
+                  bannedUsers =
+                      bannedUsers
+                          .where((doc) => doc['role'] == _selectedRole)
+                          .toList();
                 }
 
                 // sort by banstart
@@ -124,7 +127,9 @@ class _BlacklistPageState extends State<BlacklistPage> {
                 });
 
                 if (bannedUsers.isEmpty) {
-                  return Center(child: Text('No users match the selected role'));
+                  return Center(
+                    child: Text('No users match the selected role'),
+                  );
                 }
 
                 return ListView.builder(
@@ -136,16 +141,14 @@ class _BlacklistPageState extends State<BlacklistPage> {
                     String role = userDoc['role'] ?? 'Unknown';
 
                     return ListTile(
-                      leading: Icon(
-                        _getRoleIcon(role),
-                        color: Colors.teal,
-                      ),
+                      leading: Icon(_getRoleIcon(role), color: Colors.teal),
                       title: Text(name),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => UserDetailPage(userId: userId),
+                            builder:
+                                (context) => UserDetailPage(userId: userId),
                           ),
                         );
                       },

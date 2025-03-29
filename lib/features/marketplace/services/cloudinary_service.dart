@@ -12,11 +12,7 @@ class CloudinaryService {
   CloudinaryService._internal();
 
   // Replace with your Cloudinary credentials
-  final cloudinary = CloudinaryPublic(
-    'docmjo6o9', // Replace with your actual cloud name
-    'marketplace', // Replace with your upload preset
-    cache: false,
-  );
+  final cloudinary = CloudinaryPublic('docmjo6o9', 'marketplace', cache: false);
 
   Future<String> uploadImage(File imageFile, {String? folder}) async {
     try {

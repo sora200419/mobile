@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobiletesting/View/login_screen.dart';
 import 'package:mobiletesting/services/auth_service.dart';
+import 'package:mobiletesting/utils/validators/validation.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -21,6 +22,28 @@ class _SignupScreenState extends State<SignupScreen> {
   final AuthService _authService = AuthService();
   // signup function to handle user registration
   void _signup() async {
+    // Validate inputs first
+    String? emailError = CampusLinkValidator.validateEmail(
+      emailController.text,
+    );
+    String? passwordError = CampusLinkValidator.validatePassword(
+      passwordController.text,
+    );
+
+    // If any validation errors exist, show them and return
+    if (emailError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(emailError)));
+      return;
+    }
+
+    if (passwordError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(passwordError)));
+      return;
+    }
     setState(() {
       isLoading = true;
     });

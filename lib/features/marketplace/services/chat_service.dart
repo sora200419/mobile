@@ -349,7 +349,7 @@ class ChatService {
     return docRef.id;
   }
 
-  // Mark all messages as read in a chat
+  // Mark messages as read in a chat
   Future<void> markChatAsRead(String chatId) async {
     if (currentUserId == null) {
       return;
