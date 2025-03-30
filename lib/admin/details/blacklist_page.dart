@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/admin/details/user_details.dart';
+import 'package:campuslink/admin/details/user_details.dart';
 
 class BlacklistPage extends StatefulWidget {
   @override

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'comments_page.dart';
-import 'package:mobiletesting/admin/details/user_details.dart';
+import 'package:campuslink/admin/details/user_details.dart';
 
 class PostDetailsPage extends StatelessWidget {
   final String postId;
@@ -135,9 +135,8 @@ class PostDetailsPage extends StatelessWidget {
                                   context,
                                   MaterialPageRoute(
                                     builder:
-                                        (context) => UserDetailPage(
-                                          userId: userId,
-                                        ),
+                                        (context) =>
+                                            UserDetailPage(userId: userId),
                                   ),
                                 );
                               } else {

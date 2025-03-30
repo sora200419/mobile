@@ -1,11 +1,11 @@
 // lib/tabs/community_tab.dart
 
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/community_post_model.dart';
-import 'package:mobiletesting/features/community/services/community_service.dart';
-import 'package:mobiletesting/features/community/views/components/post_card.dart';
-import 'package:mobiletesting/features/community/views/components/post_filter.dart';
-import 'package:mobiletesting/features/community/views/create_post_screen.dart';
+import 'package:campuslink/features/community/models/community_post_model.dart';
+import 'package:campuslink/features/community/services/community_service.dart';
+import 'package:campuslink/features/community/views/components/post_card.dart';
+import 'package:campuslink/features/community/views/components/post_filter.dart';
+import 'package:campuslink/features/community/views/create_post_screen.dart';
 
 class CommunityTab extends StatefulWidget {
   const CommunityTab({Key? key}) : super(key: key);

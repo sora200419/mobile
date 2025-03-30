@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mobiletesting/features/community/models/community_post_model.dart';
-import 'package:mobiletesting/features/community/services/community_service.dart';
-import 'package:mobiletesting/features/community/views/components/post_card.dart';
+import 'package:campuslink/features/community/models/community_post_model.dart';
+import 'package:campuslink/features/community/services/community_service.dart';
+import 'package:campuslink/features/community/views/components/post_card.dart';
 
 class BookmarkedPostsScreen extends StatefulWidget {
   const BookmarkedPostsScreen({Key? key}) : super(key: key);

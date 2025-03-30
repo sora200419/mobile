@@ -5,7 +5,7 @@ import 'package:location/location.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 
-import 'package:mobiletesting/features/task/services/location_service.dart';
+import 'package:campuslink/features/task/services/location_service.dart';
 
 class MapScreen extends StatefulWidget {
   final LatLng? taskLocation;

@@ -1,10 +1,10 @@
-import 'package:mobiletesting/utils/constants/firebase_options.dart';
+import 'package:campuslink/utils/constants/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
-import 'package:mobiletesting/View/login_screen.dart';
-import 'package:mobiletesting/services/dynamic_links_service.dart'; // Add this
+import 'package:campuslink/services/auth_provider.dart';
+import 'package:campuslink/View/login_screen.dart';
+import 'package:campuslink/services/dynamic_links_service.dart'; // Add this
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

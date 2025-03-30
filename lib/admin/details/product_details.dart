@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:mobiletesting/admin/details/user_details.dart';
+import 'package:campuslink/admin/details/user_details.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   final String productId;
@@ -38,11 +38,12 @@ class ProductDetailsPage extends StatelessWidget {
                   child: Image.network(
                     imageUrl,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.broken_image,
-                      size: 200,
-                      color: Colors.grey,
-                    ),
+                    errorBuilder:
+                        (context, error, stackTrace) => const Icon(
+                          Icons.broken_image,
+                          size: 200,
+                          color: Colors.grey,
+                        ),
                   ),
                 ),
               ),
@@ -108,12 +109,13 @@ class ProductDetailsPage extends StatelessWidget {
     );
   }
 
-Widget _buildImageGallery() {
+  Widget _buildImageGallery() {
     final mainImage = productData['imageUrl'];
-    final additionalImages = productData['additionalImages'] is List
-        ? List<String>.from(productData['additionalImages'])
-        : <String>[];
-    
+    final additionalImages =
+        productData['additionalImages'] is List
+            ? List<String>.from(productData['additionalImages'])
+            : <String>[];
+
     final allImages = [
       if (mainImage != null && mainImage.toString().isNotEmpty) mainImage,
       ...additionalImages,
@@ -156,12 +158,16 @@ Widget _buildImageGallery() {
                       child: Image.network(
                         allImages[index],
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Icon(Icons.broken_image, color: Colors.grey),
-                          ),
-                        ),
+                        errorBuilder:
+                            (context, error, stackTrace) => Container(
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
                       ),
                     ),
                   ),
@@ -174,55 +180,60 @@ Widget _buildImageGallery() {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, String title, String value, {String? userId}) {
-  return Card(
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.teal,
+  Widget _buildInfoCard(
+    BuildContext context,
+    String title,
+    String value, {
+    String? userId,
+  }) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 100,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: title == 'Seller' && userId != null
-                ? GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => UserDetailPage(
-                            userId: userId,
+            Expanded(
+              child:
+                  title == 'Seller' && userId != null
+                      ? GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => UserDetailPage(userId: userId),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          value,
+                          style: const TextStyle(
+                            color: Colors.teal,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
-                      );
-                    },
-                    child: Text(
-                      value,
-                      style: const TextStyle(
-                        color: Colors.teal,
-                        decoration: TextDecoration.underline,
+                      )
+                      : Text(
+                        value,
+                        style: const TextStyle(color: Colors.black87),
                       ),
-                    ),
-                  )
-                : Text(
-                    value,
-                    style: const TextStyle(color: Colors.black87),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +252,6 @@ Widget _buildImageGallery() {
       ),
       body: Column(
         children: [
-
           GestureDetector(
             onTap: () {
               if (productData['imageUrl'] != null &&
@@ -253,18 +263,20 @@ Widget _buildImageGallery() {
               height: 200,
               width: double.infinity,
               color: Colors.grey[200],
-              child: productData['imageUrl'] != null &&
-                      productData['imageUrl'].toString().isNotEmpty
-                  ? Image.network(
-                      productData['imageUrl'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.broken_image,
-                        size: 60,
-                        color: Colors.grey,
-                      ),
-                    )
-                  : const Icon(Icons.image, size: 60, color: Colors.grey),
+              child:
+                  productData['imageUrl'] != null &&
+                          productData['imageUrl'].toString().isNotEmpty
+                      ? Image.network(
+                        productData['imageUrl'],
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (context, error, stackTrace) => const Icon(
+                              Icons.broken_image,
+                              size: 60,
+                              color: Colors.grey,
+                            ),
+                      )
+                      : const Icon(Icons.image, size: 60, color: Colors.grey),
             ),
           ),
 
@@ -305,7 +317,9 @@ Widget _buildImageGallery() {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.teal[50],
                     borderRadius: BorderRadius.circular(20),
@@ -325,28 +339,36 @@ Widget _buildImageGallery() {
 
           // Product Info Section
           Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildImageGallery(),
-                const SizedBox(height: 16),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildImageGallery(),
+                  const SizedBox(height: 16),
 
-                // Key Product Information
-                _buildInfoCard(context, 'Status', productData['status'] ?? 'N/A'),
-                _buildInfoCard(context, 'Category', productData['category'] ?? 'N/A'),
-                _buildInfoCard(
-                  context,
-                  'Condition',
-                  productData['condition'] ?? 'N/A',
-                ),
-                _buildInfoCard(
-                  context,
-                  'Seller',
-                  productData['sellerName'] ?? 'Unknown',
-                  userId: sellerId,
-                ),
+                  // Key Product Information
+                  _buildInfoCard(
+                    context,
+                    'Status',
+                    productData['status'] ?? 'N/A',
+                  ),
+                  _buildInfoCard(
+                    context,
+                    'Category',
+                    productData['category'] ?? 'N/A',
+                  ),
+                  _buildInfoCard(
+                    context,
+                    'Condition',
+                    productData['condition'] ?? 'N/A',
+                  ),
+                  _buildInfoCard(
+                    context,
+                    'Seller',
+                    productData['sellerName'] ?? 'Unknown',
+                    userId: sellerId,
+                  ),
 
                   // Description Section
                   const SizedBox(height: 16),

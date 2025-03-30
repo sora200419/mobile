@@ -2,10 +2,10 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mobiletesting/features/gamification/constants/gamification_rules.dart';
-import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
-import 'package:mobiletesting/features/task/model/task_model.dart';
-import 'package:mobiletesting/features/task/services/location_service.dart';
+import 'package:campuslink/features/gamification/constants/gamification_rules.dart';
+import 'package:campuslink/features/gamification/services/gamification_service.dart';
+import 'package:campuslink/features/task/model/task_model.dart';
+import 'package:campuslink/features/task/services/location_service.dart';
 
 class TaskService {
   final FirebaseAuth _auth = FirebaseAuth.instance;

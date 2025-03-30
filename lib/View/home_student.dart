@@ -2,20 +2,20 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
-import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
-import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
+import 'package:campuslink/features/gamification/models/user_progress_model.dart';
+import 'package:campuslink/features/marketplace/views/add_product_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
-import 'package:mobiletesting/features/task/views/student_task_detail_screen.dart';
-import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
-import 'package:mobiletesting/features/community/views/create_post_screen.dart';
+import 'package:campuslink/services/auth_provider.dart';
+import 'package:campuslink/features/task/views/student_task_detail_screen.dart';
+import 'package:campuslink/features/gamification/services/gamification_service.dart';
+import 'package:campuslink/features/community/views/create_post_screen.dart';
 
 // Import the tab widgets
-import 'package:mobiletesting/tabs/tasks_tab.dart';
-import 'package:mobiletesting/tabs/marketplace_tab.dart';
-import 'package:mobiletesting/tabs/community_tab.dart';
-import 'package:mobiletesting/tabs/messages_tab.dart';
-import 'package:mobiletesting/tabs/profile_tab.dart';
+import 'package:campuslink/tabs/tasks_tab.dart';
+import 'package:campuslink/tabs/marketplace_tab.dart';
+import 'package:campuslink/tabs/community_tab.dart';
+import 'package:campuslink/tabs/messages_tab.dart';
+import 'package:campuslink/tabs/profile_tab.dart';
 
 class HomeStudent extends StatefulWidget {
   const HomeStudent({Key? key}) : super(key: key);

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
-import 'package:mobiletesting/admin/tab/posts_tab.dart';
-import 'package:mobiletesting/admin/tab/products_tab.dart';
-import 'package:mobiletesting/admin/business_data.dart';
-import 'package:mobiletesting/admin/settings.dart';
-import 'package:mobiletesting/admin/user_management.dart';
-import 'package:mobiletesting/admin/notifications.dart';
+import 'package:campuslink/services/auth_provider.dart';
+import 'package:campuslink/admin/tab/posts_tab.dart';
+import 'package:campuslink/admin/tab/products_tab.dart';
+import 'package:campuslink/admin/business_data.dart';
+import 'package:campuslink/admin/settings.dart';
+import 'package:campuslink/admin/user_management.dart';
+import 'package:campuslink/admin/notifications.dart';
 
 class HomeAdmin extends StatefulWidget {
   const HomeAdmin({super.key});
@@ -47,14 +47,8 @@ class _HomeAdminState extends State<HomeAdmin> {
         elevation: 2,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "User",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "User"),
           BottomNavigationBarItem(
             icon: Icon(Icons.trending_up),
             label: "Business",
@@ -94,9 +88,7 @@ class HomeTabPage extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => NotificationsPage(),
-                  ),
+                  MaterialPageRoute(builder: (context) => NotificationsPage()),
                 );
               },
               tooltip: 'Notifications',
@@ -112,18 +104,10 @@ class HomeTabPage extends StatelessWidget {
             indicatorColor: Colors.white,
             indicatorWeight: 3,
             indicatorSize: TabBarIndicatorSize.tab,
-            tabs: [
-              Tab(text: "Posts"),
-              Tab(text: "Products"),
-            ],
+            tabs: [Tab(text: "Posts"), Tab(text: "Products")],
           ),
         ),
-        body: TabBarView(
-          children: [
-            PostsTab(),
-            ProductsTab(),
-          ],
-        ),
+        body: TabBarView(children: [PostsTab(), ProductsTab()]),
       ),
     );
   }

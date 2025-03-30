@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/View/home_admin.dart';
-import 'package:mobiletesting/View/home_runner.dart';
-import 'package:mobiletesting/View/home_student.dart';
-import 'package:mobiletesting/View/signup_screen.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
+import 'package:campuslink/View/home_admin.dart';
+import 'package:campuslink/View/home_runner.dart';
+import 'package:campuslink/View/home_student.dart';
+import 'package:campuslink/View/signup_screen.dart';
+import 'package:campuslink/services/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {

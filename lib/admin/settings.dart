@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:mobiletesting/admin/details/blacklist_page.dart';
-import 'package:mobiletesting/View/login_screen.dart';
-import 'package:mobiletesting/services/auth_provider.dart' as custom; 
+import 'package:campuslink/admin/details/blacklist_page.dart';
+import 'package:campuslink/View/login_screen.dart';
+import 'package:campuslink/services/auth_provider.dart' as custom;
 
 class SettingsPage extends StatefulWidget {
   @override
@@ -54,8 +54,9 @@ class _SettingsPageState extends State<SettingsPage> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('No user signed in')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No user signed in')));
 
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => LoginScreen()),
@@ -66,15 +67,17 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading user data: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading user data: $e')));
     }
   }
 
   Future<void> _updateName() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Name cannot be empty')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Name cannot be empty')));
       return;
     }
 
@@ -87,22 +90,28 @@ class _SettingsPageState extends State<SettingsPage> {
         setState(() {
           currentName = _nameController.text.trim();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Name updated successfully')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Name updated successfully')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error updating name: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating name: $e')));
     }
   }
 
   Future<void> _logout() async {
     try {
-      final authProvider = Provider.of<custom.AuthProvider>(context, listen: false); 
+      final authProvider = Provider.of<custom.AuthProvider>(
+        context,
+        listen: false,
+      );
       await authProvider.logout(context);
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error signing out: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
     }
   }
 
@@ -191,26 +200,27 @@ class _SettingsPageState extends State<SettingsPage> {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text("Confirm Logout"),
-                    content: Text("Are you sure you want to log out?"),
-                    actions: [
-                      TextButton(
-                        child: Text("Cancel"),
-                        onPressed: () => Navigator.pop(context),
+                  builder:
+                      (context) => AlertDialog(
+                        title: Text("Confirm Logout"),
+                        content: Text("Are you sure you want to log out?"),
+                        actions: [
+                          TextButton(
+                            child: Text("Cancel"),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          TextButton(
+                            child: Text(
+                              "Logout",
+                              style: TextStyle(color: Colors.red),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _logout();
+                            },
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        child: Text(
-                          "Logout",
-                          style: TextStyle(color: Colors.red),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _logout();
-                        },
-                      ),
-                    ],
-                  ),
                 );
               },
               style: ElevatedButton.styleFrom(

@@ -1,11 +1,11 @@
 // lib/tabs/marketplace_tab.dart
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/marketplace/models/product_model.dart';
-import 'package:mobiletesting/features/marketplace/services/marketplace_service.dart';
-import 'package:mobiletesting/features/marketplace/services/chat_service.dart';
-import 'package:mobiletesting/features/marketplace/views/add_product_screen.dart';
-import 'package:mobiletesting/features/marketplace/views/my_transactions_screen.dart';
-import 'package:mobiletesting/features/marketplace/widgets/product_card.dart';
+import 'package:campuslink/features/marketplace/models/product_model.dart';
+import 'package:campuslink/features/marketplace/services/marketplace_service.dart';
+import 'package:campuslink/features/marketplace/services/chat_service.dart';
+import 'package:campuslink/features/marketplace/views/add_product_screen.dart';
+import 'package:campuslink/features/marketplace/views/my_transactions_screen.dart';
+import 'package:campuslink/features/marketplace/widgets/product_card.dart';
 
 class MarketplaceTab extends StatefulWidget {
   const MarketplaceTab({Key? key}) : super(key: key);

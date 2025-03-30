@@ -2,13 +2,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:mobiletesting/features/community/models/community_post_model.dart';
-import 'package:mobiletesting/features/community/services/community_service.dart';
-import 'package:mobiletesting/features/community/utils/post_utilities.dart';
-import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
+import 'package:campuslink/features/community/models/community_post_model.dart';
+import 'package:campuslink/features/community/services/community_service.dart';
+import 'package:campuslink/features/community/utils/post_utilities.dart';
+import 'package:campuslink/features/community/views/post_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
-import 'package:mobiletesting/features/community/services/post_share_service.dart';
+import 'package:campuslink/features/marketplace/services/cloudinary_service.dart';
+import 'package:campuslink/features/community/services/post_share_service.dart';
 
 class PostCard extends StatefulWidget {
   final CommunityPost post;

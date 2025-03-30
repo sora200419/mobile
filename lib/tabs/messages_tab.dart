@@ -3,9 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/features/task/model/task_model.dart';
-import 'package:mobiletesting/features/task/services/chat_service.dart';
-import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
+import 'package:campuslink/features/task/model/task_model.dart';
+import 'package:campuslink/features/task/services/chat_service.dart';
+import 'package:campuslink/features/task/views/task_chat_screen.dart';
 
 class MessagesTab extends StatefulWidget {
   const MessagesTab({Key? key}) : super(key: key);

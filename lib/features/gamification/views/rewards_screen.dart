@@ -3,9 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mobiletesting/features/gamification/models/reward_model.dart';
-import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
-import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
+import 'package:campuslink/features/gamification/models/reward_model.dart';
+import 'package:campuslink/features/gamification/models/user_progress_model.dart';
+import 'package:campuslink/features/gamification/services/gamification_service.dart';
 
 class RewardsScreen extends StatefulWidget {
   const RewardsScreen({Key? key}) : super(key: key);

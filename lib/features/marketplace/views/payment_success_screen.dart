@@ -1,6 +1,6 @@
 // lib/features/marketplace/views/payment_success_screen.dart
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/marketplace/views/manual_payment_screen.dart';
+import 'package:campuslink/features/marketplace/views/manual_payment_screen.dart';
 import '../models/transaction_model.dart' as models;
 import '../services/payment_service.dart';
 import 'my_transactions_screen.dart';

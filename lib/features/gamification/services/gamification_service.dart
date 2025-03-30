@@ -1,9 +1,9 @@
 // lib/features/gamification/services/gamification_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/features/gamification/constants/gamification_rules.dart';
-import 'package:mobiletesting/features/gamification/models/leaderboard_model.dart';
-import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
+import 'package:campuslink/features/gamification/constants/gamification_rules.dart';
+import 'package:campuslink/features/gamification/models/leaderboard_model.dart';
+import 'package:campuslink/features/gamification/models/user_progress_model.dart';
 
 class GamificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

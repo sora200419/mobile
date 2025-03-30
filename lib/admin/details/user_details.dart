@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/admin/details/post_details.dart';
-import 'package:mobiletesting/admin/details/product_details.dart';
+import 'package:campuslink/admin/details/post_details.dart';
+import 'package:campuslink/admin/details/product_details.dart';
 
 class UserDetailPage extends StatefulWidget {
   final String userId;

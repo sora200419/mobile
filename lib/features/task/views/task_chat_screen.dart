@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:mobiletesting/features/task/model/task_model.dart';
-import 'package:mobiletesting/features/task/services/chat_service.dart';
+import 'package:campuslink/features/task/model/task_model.dart';
+import 'package:campuslink/features/task/services/chat_service.dart';
 
 class TaskChatScreen extends StatefulWidget {
   final Task task;

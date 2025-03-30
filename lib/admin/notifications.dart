@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/admin/details/post_details.dart';
+import 'package:campuslink/admin/details/post_details.dart';
 
 class NotificationsPage extends StatefulWidget {
   @override
@@ -24,43 +24,45 @@ class _NotificationsPageState extends State<NotificationsPage> {
   ) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Report Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Reason: ${reportData['reason'] ?? 'No reason provided'}'),
-            SizedBox(height: 10),
-            Text(
-              'Additional Info: ${reportData['additionalInfo'] ?? 'None'}',
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Reported at: ${_formatTimestamp(reportData['createdAt'])}',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      PostDetailsPage(postId: reportData['postId']),
+      builder:
+          (context) => AlertDialog(
+            title: Text('Report Details'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Reason: ${reportData['reason'] ?? 'No reason provided'}'),
+                SizedBox(height: 10),
+                Text(
+                  'Additional Info: ${reportData['additionalInfo'] ?? 'None'}',
                 ),
-              );
-            },
-            child: Text('View Post', style: TextStyle(color: Colors.teal)),
+                SizedBox(height: 10),
+                Text(
+                  'Reported at: ${_formatTimestamp(reportData['createdAt'])}',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) =>
+                              PostDetailsPage(postId: reportData['postId']),
+                    ),
+                  );
+                },
+                child: Text('View Post', style: TextStyle(color: Colors.teal)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -94,11 +96,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('reports')
-            .where('status', isEqualTo: 'pending')
-            .orderBy('createdAt', descending: _isDescending) // Use dynamic sort
-            .snapshots(),
+        stream:
+            _firestore
+                .collection('reports')
+                .where('status', isEqualTo: 'pending')
+                .orderBy(
+                  'createdAt',
+                  descending: _isDescending,
+                ) // Use dynamic sort
+                .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());

@@ -1,15 +1,15 @@
 //lib\View\runner_task_details.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/View/status_tag.dart';
-import 'package:mobiletesting/features/task/model/task_model.dart';
+import 'package:campuslink/View/status_tag.dart';
+import 'package:campuslink/features/task/model/task_model.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/features/task/views/task_chat_screen.dart';
+import 'package:campuslink/features/task/views/task_chat_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'map_screen.dart';
-import 'package:mobiletesting/features/task/services/location_service.dart';
+import 'package:campuslink/features/task/services/location_service.dart';
 
 class TaskDetailsPage extends StatefulWidget {
   final Task task;

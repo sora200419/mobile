@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/View/login_screen.dart';
+import 'package:campuslink/View/login_screen.dart';
 import 'auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -47,17 +47,17 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    String? result = await _authService.login(email: email, password: password);
+    String? error = await _authService.login(email: email, password: password);
 
-    if (result != null && !result.contains("ERROR")) {
-      await checkUser();
+    if (error == null) {
+      await checkUser(); // This will fetch role and other data
       _isLoading = false;
       notifyListeners();
       return null;
     } else {
       _isLoading = false;
       notifyListeners();
-      return result;
+      return error;
     }
   }
 
@@ -106,13 +106,16 @@ class AuthProvider extends ChangeNotifier {
               .collection("users")
               .doc(_user!.uid)
               .get();
-      
+
       // Get the data map and safely check for fields
       Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
-      
+
       // Check if isBanned exists and is a boolean, default to false if not present
-      _isBanned = data?.containsKey('isBanned') == true ? data!['isBanned'] as bool : false;
-      
+      _isBanned =
+          data?.containsKey('isBanned') == true
+              ? data!['isBanned'] as bool
+              : false;
+
       // Check if banEnd exists and convert if present
       if (data?.containsKey('banEnd') == true && data!['banEnd'] != null) {
         _banEnd = (data['banEnd'] as Timestamp).toDate();

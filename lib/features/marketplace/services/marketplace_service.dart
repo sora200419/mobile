@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:campuslink/features/marketplace/services/cloudinary_service.dart';
 import '../models/product_model.dart';
 
 class MarketplaceService {

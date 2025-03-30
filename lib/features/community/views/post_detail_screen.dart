@@ -2,15 +2,15 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/community/models/community_post_model.dart';
-import 'package:mobiletesting/features/community/services/community_service.dart';
-import 'package:mobiletesting/features/community/utils/post_utilities.dart';
-import 'package:mobiletesting/features/community/views/components/post_card.dart';
-import 'package:mobiletesting/features/community/views/components/comment_section.dart';
-import 'package:mobiletesting/features/community/views/create_post_screen.dart';
+import 'package:campuslink/features/community/models/community_post_model.dart';
+import 'package:campuslink/features/community/services/community_service.dart';
+import 'package:campuslink/features/community/utils/post_utilities.dart';
+import 'package:campuslink/features/community/views/components/post_card.dart';
+import 'package:campuslink/features/community/views/components/comment_section.dart';
+import 'package:campuslink/features/community/views/create_post_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:mobiletesting/features/marketplace/services/cloudinary_service.dart';
+import 'package:campuslink/features/marketplace/services/cloudinary_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';

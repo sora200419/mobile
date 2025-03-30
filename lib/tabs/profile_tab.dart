@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/features/gamification/models/user_progress_model.dart';
+import 'package:campuslink/features/gamification/models/user_progress_model.dart';
 import 'package:provider/provider.dart';
-import 'package:mobiletesting/services/auth_provider.dart';
-import 'package:mobiletesting/features/gamification/services/gamification_service.dart';
-import 'package:mobiletesting/features/gamification/views/achievements_screen.dart';
-import 'package:mobiletesting/features/gamification/views/leaderboard_screen.dart';
-import 'package:mobiletesting/features/gamification/views/rewards_screen.dart';
-import 'package:mobiletesting/utils/ui_utils.dart';
-import 'package:mobiletesting/features/community/views/bookmarked_posts_screen.dart';
+import 'package:campuslink/services/auth_provider.dart';
+import 'package:campuslink/features/gamification/services/gamification_service.dart';
+import 'package:campuslink/features/gamification/views/achievements_screen.dart';
+import 'package:campuslink/features/gamification/views/leaderboard_screen.dart';
+import 'package:campuslink/features/gamification/views/rewards_screen.dart';
+import 'package:campuslink/utils/ui_utils.dart';
+import 'package:campuslink/features/community/views/bookmarked_posts_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({Key? key}) : super(key: key);

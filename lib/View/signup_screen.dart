@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/View/login_screen.dart';
-import 'package:mobiletesting/services/auth_service.dart';
-import 'package:mobiletesting/utils/validators/validation.dart';
+import 'package:campuslink/View/login_screen.dart';
+import 'package:campuslink/services/auth_service.dart';
+import 'package:campuslink/utils/validators/validation.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});

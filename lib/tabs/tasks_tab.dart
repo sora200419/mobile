@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:mobiletesting/features/task/model/task_model.dart';
-import 'package:mobiletesting/features/task/services/task_service.dart';
-import 'package:mobiletesting/features/task/views/student_task_detail_screen.dart';
-import 'package:mobiletesting/utils/ui_utils.dart';
+import 'package:campuslink/features/task/model/task_model.dart';
+import 'package:campuslink/features/task/services/task_service.dart';
+import 'package:campuslink/features/task/views/student_task_detail_screen.dart';
+import 'package:campuslink/utils/ui_utils.dart';
 
 class TasksTab extends StatefulWidget {
   const TasksTab({Key? key}) : super(key: key);

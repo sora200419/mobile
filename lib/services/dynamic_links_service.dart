@@ -2,8 +2,8 @@
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/features/community/models/community_post_model.dart';
-import 'package:mobiletesting/features/community/views/post_detail_screen.dart';
+import 'package:campuslink/features/community/models/community_post_model.dart';
+import 'package:campuslink/features/community/views/post_detail_screen.dart';
 
 class DynamicLinksService {
   static final DynamicLinksService _instance = DynamicLinksService._internal();

@@ -3,9 +3,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:mobiletesting/features/community/models/community_post_model.dart';
-import 'package:mobiletesting/features/community/services/community_service.dart';
-import 'package:mobiletesting/features/community/utils/post_utilities.dart';
+import 'package:campuslink/features/community/models/community_post_model.dart';
+import 'package:campuslink/features/community/services/community_service.dart';
+import 'package:campuslink/features/community/utils/post_utilities.dart';
 
 class CreatePostScreen extends StatefulWidget {
   final CommunityPost? post; // If editing an existing post

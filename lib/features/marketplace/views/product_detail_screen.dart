@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
-import 'package:mobiletesting/features/marketplace/models/chat_model.dart';
+import 'package:campuslink/features/marketplace/models/chat_model.dart';
 import '../models/product_model.dart';
 import '../models/transaction_model.dart' as models;
 import '../services/marketplace_service.dart';

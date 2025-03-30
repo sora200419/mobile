@@ -16,10 +16,11 @@ class AuthService {
   }) async {
     try {
       // Create user in Firebase Authentication with email and password
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password.trim(),
-      );
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password.trim(),
+          );
 
       // Prepare user data with basic fields
       Map<String, dynamic> userData = {
@@ -36,16 +37,20 @@ class AuthService {
         });
       } else if (role.trim() == 'Runner') {
         userData.addAll({
-          'points': 0,          // Default value for points (int) for Runner
-          'averageRating': 0.0, // Default value for averageRating (double) for Runner
-          'ratingCount': 0,     // Default value for ratingCount (int) for Runner
+          'points': 0, // Default value for points (int) for Runner
+          'averageRating':
+              0.0, // Default value for averageRating (double) for Runner
+          'ratingCount': 0, // Default value for ratingCount (int) for Runner
           'isBanned': false, // Add isBanned field with default value false
         });
       }
       // Admin role does not need additional fields
 
       // Save user data in Firestore
-      await _firestore.collection("users").doc(userCredential.user!.uid).set(userData);
+      await _firestore
+          .collection("users")
+          .doc(userCredential.user!.uid)
+          .set(userData);
 
       return null; // Success: no error message
     } catch (e) {
@@ -59,20 +64,13 @@ class AuthService {
     required String password,
   }) async {
     try {
-      // Sign in user using Firebase Authentication with email and password
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
       );
-
-      // Fetching the user's role from Firestore to determine access level
-      DocumentSnapshot userDoc = await _firestore
-          .collection("users")
-          .doc(userCredential.user!.uid)
-          .get();
-      return userDoc['role']; // Return the user's role (Admin/Student/Runner)
+      return null; // Success
     } catch (e) {
-      return e.toString(); // Error: return the exception
+      return e.toString(); // Error message
     }
   }
 

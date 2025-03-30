@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobiletesting/admin/details/user_details.dart';
-import 'package:mobiletesting/admin/admin_management.dart';
+import 'package:campuslink/admin/details/user_details.dart';
+import 'package:campuslink/admin/admin_management.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({Key? key}) : super(key: key);
@@ -286,7 +286,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
     if (_selectedRole != null) {
       query = query.where('role', isEqualTo: _selectedRole);
     } else {
-
       query = query.where('role', whereIn: ['Student', 'Runner']);
     }
 
