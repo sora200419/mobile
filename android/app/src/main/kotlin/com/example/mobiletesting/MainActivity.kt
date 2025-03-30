@@ -1,4 +1,4 @@
-package com.example.mobiletesting
+package com.example.campuslink
 
 import io.flutter.embedding.android.FlutterActivity
 
