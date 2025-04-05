@@ -2,13 +2,13 @@
 CampusLink is a mobile application designed to connect students on campus through various features:
 
 # Features
-Social Community: Post sharing, bookmarking, and community engagement./n
-Marketplace: Buy, sell, and manage products within campus./n
-Messaging: Chat with other students individually and in groups./n
-Tasks: Collaborate on tasks and projects with rating system./n
-Emergency Services: Access to campus emergency information./n
-Profile Management: Manage your student profile and achievements./n
-Leaderboards & Rewards: Gamification elements to encourage participation./n
+Social Community: Post sharing, bookmarking, and community engagement.
+Marketplace: Buy, sell, and manage products within campus.
+Messaging: Chat with other students individually and in groups.
+Tasks: Collaborate on tasks and projects with rating system.
+Emergency Services: Access to campus emergency information.
+Profile Management: Manage your student profile and achievements.
+Leaderboards & Rewards: Gamification elements to encourage participation.
 
 # Technical Details
 Built with Flutter
